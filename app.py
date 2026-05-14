@@ -4,6 +4,27 @@ from datetime import datetime
 
 st.set_page_config(page_title="Attendance App", layout="centered")
 
+# ✅ LOGIN SYSTEM
+users = {
+    "admin": "admin123",
+    "kunal": "1234"
+}
+
+st.sidebar.title("🔐 Login")
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if st.sidebar.button("Login"):
+    if username in users and users[username] == password:
+        st.session_state["logged_in"] = True
+        st.success(f"Welcome {username}")
+    else:
+        st.error("Invalid credentials")
+
+if "logged_in" not in st.session_state:
+    st.stop()
+
+# ✅ MAIN APP
 st.title("📊 Attendance Management System")
 
 # ✅ Load Employees
@@ -11,10 +32,9 @@ try:
     df_emp = pd.read_excel("employees.xlsx")
     employees = df_emp["Employee Name"].dropna().tolist()
 except:
-    st.error("❌ employees.xlsx not found")
+    st.error("employees.xlsx not found")
     st.stop()
 
-# ✅ Inputs
 date = st.date_input("Select Date")
 employee = st.selectbox("Employee Name", employees)
 
@@ -23,40 +43,37 @@ attendance_type = st.selectbox(
     ["Present WFO", "Present WFH", "Half Day", "Leave"]
 )
 
-# ✅ Load/Create Data
 file_name = "attendance.csv"
 
 try:
     df = pd.read_csv(file_name)
 except:
     df = pd.DataFrame(columns=[
-        "Date", "Employee", "Login", "Logout", "Working Hours", "Status", "Type"
+        "Date","Employee","Login","Logout","Working Hours","Status","Type"
     ])
 
-# ✅ FIND EXISTING RECORD
 existing_index = df[
     (df["Date"] == str(date)) &
     (df["Employee"] == employee)
 ].index
 
-# ✅ BUTTON SECTION (IMPORTANT UI FIX)
+# ✅ BUTTONS
 col1, col2, col3 = st.columns(3)
 
+# LOGIN
 with col1:
     if st.button("🟢 Login Now"):
         current_time = datetime.now().strftime("%H:%M:%S")
 
         if len(existing_index) > 0:
             idx = existing_index[0]
-
-            if df.at[idx, "Login"] == "" or pd.isna(df.at[idx, "Login"]):
+            if pd.isna(df.at[idx, "Login"]) or df.at[idx, "Login"] == "":
                 df.at[idx, "Login"] = current_time
                 df.at[idx, "Status"] = "In Progress"
                 df.at[idx, "Type"] = attendance_type
-                st.success(f"✅ Login at {current_time}")
+                st.success(f"Login at {current_time}")
             else:
-                st.warning("⚠️ Login already done")
-
+                st.warning("Already logged in")
         else:
             new_row = {
                 "Date": str(date),
@@ -68,11 +85,11 @@ with col1:
                 "Type": attendance_type
             }
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            st.success(f"✅ Login at {current_time}")
+            st.success(f"Login at {current_time}")
 
         df.to_csv(file_name, index=False)
 
-
+# LOGOUT
 with col2:
     if st.button("🔴 Logout Now"):
         current_time = datetime.now().strftime("%H:%M:%S")
@@ -81,45 +98,39 @@ with col2:
             idx = existing_index[0]
 
             if df.at[idx, "Login"] == "":
-                st.error("❌ Please login first")
+                st.error("Login first")
 
-            elif df.at[idx, "Logout"] == "" or pd.isna(df.at[idx, "Logout"]):
-
+            elif pd.isna(df.at[idx, "Logout"]) or df.at[idx, "Logout"] == "":
                 df.at[idx, "Logout"] = current_time
 
-                try:
-                    login_time = pd.to_datetime(df.at[idx, "Login"])
-                    logout_time = pd.to_datetime(current_time)
+                login_time = pd.to_datetime(df.at[idx, "Login"])
+                logout_time = pd.to_datetime(current_time)
 
-                    hours = (logout_time - login_time).total_seconds() / 3600
-                    df.at[idx, "Working Hours"] = round(hours, 2)
+                hours = (logout_time - login_time).total_seconds()/3600
+                df.at[idx, "Working Hours"] = round(hours,2)
 
-                    if attendance_type == "Leave":
-                        status = "Leave"
-                    elif attendance_type == "Half Day":
-                        status = "Half Day"
-                    elif hours >= 8:
-                        status = "Present"
-                    else:
-                        status = "Half Day"
+                if attendance_type == "Leave":
+                    status = "Leave"
+                elif attendance_type == "Half Day":
+                    status = "Half Day"
+                elif hours >= 8:
+                    status = "Present"
+                else:
+                    status = "Half Day"
 
-                    df.at[idx, "Status"] = status
-                    df.at[idx, "Type"] = attendance_type
+                df.at[idx, "Status"] = status
+                df.at[idx, "Type"] = attendance_type
 
-                    st.success(f"✅ Logout at {current_time}")
-
-                except:
-                    st.error("❌ Error calculating hours")
+                st.success(f"Logout at {current_time}")
 
             else:
-                st.warning("⚠️ Already logged out")
-
+                st.warning("Already logged out")
         else:
-            st.error("❌ Login not found")
+            st.error("No login found")
 
         df.to_csv(file_name, index=False)
 
-
+# MARK WITHOUT LOGIN
 with col3:
     if st.button("✅ Mark Without Login"):
         if attendance_type in ["Leave", "Half Day"]:
@@ -136,12 +147,11 @@ with col3:
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(file_name, index=False)
 
-            st.success(f"✅ {attendance_type} marked")
+            st.success(f"{attendance_type} marked")
         else:
-            st.warning("⚠️ Use Login/Logout for WFO/WFH")
+            st.warning("Use login/logout for WFO/WFH")
 
-
-# ✅ DISPLAY DATA
+# ✅ TABLE
 st.subheader("📋 Attendance Records")
 
 try:
@@ -153,5 +163,51 @@ try:
         df.to_csv(index=False),
         file_name="attendance_report.csv"
     )
+
 except:
-    st.info("No attendance data yet")
+    st.info("No data")
+
+# ✅ DASHBOARD
+st.subheader("📊 Dashboard")
+
+try:
+    present = (df["Status"] == "Present").sum()
+    leave = (df["Status"] == "Leave").sum()
+    half = (df["Status"] == "Half Day").sum()
+
+    chart_df = pd.DataFrame({
+        "Type": ["Present","Leave","Half Day"],
+        "Count": [present, leave, half]
+    })
+
+    st.bar_chart(chart_df.set_index("Type"))
+
+    st.write(f"✅ Present: {present}")
+    st.write(f"📅 Leave: {leave}")
+    st.write(f"⏳ Half Day: {half}")
+
+except:
+    st.info("No dashboard data")
+
+# ✅ MONTHLY REPORT
+st.subheader("📅 Monthly Report")
+
+try:
+    df["Date"] = pd.to_datetime(df["Date"])
+
+    months = df["Date"].dt.to_period("M").astype(str).unique()
+
+    selected_month = st.selectbox("Select Month", months)
+
+    monthly_df = df[df["Date"].dt.to_period("M").astype(str) == selected_month]
+
+    st.dataframe(monthly_df)
+
+    st.download_button(
+        "📥 Download Monthly Report",
+        monthly_df.to_csv(index=False),
+        file_name=f"attendance_{selected_month}.csv"
+    )
+
+except:
+    st.info("No monthly data")
