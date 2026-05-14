@@ -4,15 +4,37 @@ from datetime import datetime
 
 st.set_page_config(page_title="Attendance System", layout="centered")
 
-# ✅ USER LOGIN DATA
+# ✅ LOAD EMPLOYEES EXCEL
+try:
+    df_emp = pd.read_excel("employees.xlsx")
+except:
+    st.error("❌ employees.xlsx not found")
+    st.stop()
+
+# ✅ CREATE USERS AUTO FROM EXCEL
 users = {
-    "admin": {"password": "admin123", "role": "admin"},
-    "kunal": {"password": "1234", "role": "employee"},
-    "rahul": {"password": "1234", "role": "employee"}
+    "admin": {
+        "password": "admin123",
+        "role": "admin",
+        "employee_name": "ADMIN"
+    }
 }
 
-# ✅ LOGIN PANEL
+for _, row in df_emp.iterrows():
+    emp_name = row["Employee Name"]
+    password = str(row["Password"])
+
+    username = emp_name.split()[0].lower()
+
+    users[username] = {
+        "password": password,
+        "role": "employee",
+        "employee_name": emp_name
+    }
+
+# ✅ LOGIN SYSTEM
 st.sidebar.title("🔐 Login")
+
 username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
 
@@ -21,6 +43,7 @@ if st.sidebar.button("Login"):
         st.session_state["logged_in"] = True
         st.session_state["user"] = username
         st.session_state["role"] = users[username]["role"]
+        st.session_state["employee_name"] = users[username]["employee_name"]
         st.success(f"✅ Welcome {username}")
     else:
         st.error("❌ Invalid credentials")
@@ -28,24 +51,19 @@ if st.sidebar.button("Login"):
 if "logged_in" not in st.session_state:
     st.stop()
 
-# ✅ ROLE
+# ✅ ROLE SETUP
 role = st.session_state["role"]
 
 st.title("📊 Attendance Management System")
 
-# ✅ LOAD EMPLOYEES
-try:
-    df_emp = pd.read_excel("employees.xlsx")
-    employees = df_emp["Employee Name"].dropna().tolist()
-except:
-    st.error("employees.xlsx not found")
-    st.stop()
-
 date = st.date_input("Select Date")
 
-# ✅ Employee Restriction
+# ✅ EMPLOYEE CONTROL
+employees = df_emp["Employee Name"].dropna().tolist()
+
 if role == "employee":
-    employee = st.session_state["user"]
+    employee = st.session_state["employee_name"]
+    st.info(f"Logged in as: {employee}")
 else:
     employee = st.selectbox("Employee Name", employees)
 
@@ -63,68 +81,68 @@ except:
         "Date","Employee","Login","Logout","Working Hours","Status","Type"
     ])
 
-existing_index = df[
+existing = df[
     (df["Date"] == str(date)) &
     (df["Employee"] == employee)
 ].index
 
-# ✅ BUTTONS (LOGIN / LOGOUT / MARK)
+# ✅ BUTTONS
 col1, col2, col3 = st.columns(3)
 
-# LOGIN
+# ✅ LOGIN BUTTON
 with col1:
     if st.button("🟢 Login Now"):
-        current_time = datetime.now().strftime("%H:%M:%S")
+        now = datetime.now().strftime("%H:%M:%S")
 
-        if len(existing_index) > 0:
-            idx = existing_index[0]
-            if df.at[idx, "Login"] == "" or pd.isna(df.at[idx, "Login"]):
-                df.at[idx, "Login"] = current_time
+        if len(existing) > 0:
+            idx = existing[0]
+            if pd.isna(df.at[idx, "Login"]) or df.at[idx, "Login"] == "":
+                df.at[idx, "Login"] = now
                 df.at[idx, "Status"] = "In Progress"
                 df.at[idx, "Type"] = attendance_type
-                st.success(f"✅ Login at {current_time}")
+                st.success(f"✅ Login at {now}")
             else:
-                st.warning("⚠️ Already logged in")
+                st.warning("Already Logged In")
         else:
-            new_row = {
+            new = {
                 "Date": str(date),
                 "Employee": employee,
-                "Login": current_time,
+                "Login": now,
                 "Logout": "",
                 "Working Hours": "",
                 "Status": "In Progress",
                 "Type": attendance_type
             }
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            st.success(f"✅ Login at {current_time}")
+            df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
+            st.success(f"✅ Login at {now}")
 
         df.to_csv(file_name, index=False)
 
-# LOGOUT
+# ✅ LOGOUT
 with col2:
     if st.button("🔴 Logout Now"):
-        current_time = datetime.now().strftime("%H:%M:%S")
+        now = datetime.now().strftime("%H:%M:%S")
 
-        if len(existing_index) > 0:
-            idx = existing_index[0]
+        if len(existing) > 0:
+            idx = existing[0]
 
             if df.at[idx, "Login"] == "":
-                st.error("❌ Login first")
+                st.error("Login first")
 
-            elif df.at[idx, "Logout"] == "" or pd.isna(df.at[idx, "Logout"]):
-                df.at[idx, "Logout"] = current_time
+            elif pd.isna(df.at[idx, "Logout"]) or df.at[idx, "Logout"] == "":
+                df.at[idx, "Logout"] = now
 
                 login_time = pd.to_datetime(df.at[idx, "Login"])
-                logout_time = pd.to_datetime(current_time)
+                logout_time = pd.to_datetime(now)
 
-                hours = (logout_time - login_time).total_seconds()/3600
-                df.at[idx, "Working Hours"] = round(hours,2)
+                hrs = (logout_time - login_time).total_seconds()/3600
+                df.at[idx, "Working Hours"] = round(hrs,2)
 
                 if attendance_type == "Leave":
                     status = "Leave"
                 elif attendance_type == "Half Day":
                     status = "Half Day"
-                elif hours >= 8:
+                elif hrs >= 8:
                     status = "Present"
                 else:
                     status = "Half Day"
@@ -132,20 +150,20 @@ with col2:
                 df.at[idx, "Status"] = status
                 df.at[idx, "Type"] = attendance_type
 
-                st.success(f"✅ Logout at {current_time}")
+                st.success(f"✅ Logout at {now}")
 
             else:
-                st.warning("⚠️ Already logged out")
+                st.warning("Already logged out")
         else:
-            st.error("❌ No login found")
+            st.error("No login found")
 
         df.to_csv(file_name, index=False)
 
-# MARK WITHOUT LOGIN
+# ✅ MARK WITHOUT LOGIN
 with col3:
     if st.button("✅ Mark Without Login"):
         if attendance_type in ["Leave", "Half Day"]:
-            new_row = {
+            new = {
                 "Date": str(date),
                 "Employee": employee,
                 "Login": "",
@@ -154,70 +172,67 @@ with col3:
                 "Status": attendance_type,
                 "Type": attendance_type
             }
-
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
             df.to_csv(file_name, index=False)
 
             st.success(f"✅ {attendance_type} marked")
         else:
-            st.warning("⚠️ Use login/logout for WFO/WFH")
+            st.warning("Use Login for WFO/WFH")
 
 # ✅ TABLE
 st.subheader("📋 Attendance Records")
-try:
-    df = pd.read_csv(file_name)
-    st.dataframe(df)
 
-    st.download_button(
-        "📥 Download Full Report",
-        df.to_csv(index=False),
-        file_name="attendance_report.csv"
-    )
-except:
-    st.info("No attendance data")
+df = pd.read_csv(file_name)
+st.dataframe(df)
+
+st.download_button(
+    "📥 Download Report",
+    df.to_csv(index=False),
+    file_name="attendance_report.csv"
+)
 
 # ✅ DASHBOARD (ADMIN ONLY)
 if role == "admin":
     st.subheader("📊 Dashboard")
 
-    present = (df["Status"] == "Present").sum()
-    leave = (df["Status"] == "Leave").sum()
-    half = (df["Status"] == "Half Day").sum()
+    p = (df["Status"] == "Present").sum()
+    l = (df["Status"] == "Leave").sum()
+    h = (df["Status"] == "Half Day").sum()
 
-    chart_df = pd.DataFrame({
-        "Type": ["Present","Leave","Half Day"],
-        "Count": [present, leave, half]
+    chart = pd.DataFrame({
+        "Type":["Present","Leave","Half Day"],
+        "Count":[p,l,h]
     })
 
-    st.bar_chart(chart_df.set_index("Type"))
+    st.bar_chart(chart.set_index("Type"))
 
 # ✅ LEAVE REQUEST
 st.subheader("📩 Leave Request")
 
 if role == "employee":
-    reason = st.text_input("Reason for leave")
+    reason = st.text_input("Leave Reason")
 
-    if st.button("Submit Leave Request"):
-        leave_data = {
+    if st.button("Submit Leave"):
+        try:
+            leave_df = pd.read_csv("leave_requests.csv")
+        except:
+            leave_df = pd.DataFrame(columns=["Employee","Date","Reason","Status"])
+
+        new_leave = {
             "Employee": employee,
             "Date": str(date),
             "Reason": reason,
             "Status": "Pending"
         }
 
-        try:
-            leave_df = pd.read_csv("leave_requests.csv")
-        except:
-            leave_df = pd.DataFrame(columns=["Employee","Date","Reason","Status"])
-
-        leave_df = pd.concat([leave_df, pd.DataFrame([leave_data])])
+        leave_df = pd.concat([leave_df, pd.DataFrame([new_leave])])
         leave_df.to_csv("leave_requests.csv", index=False)
 
         st.success("✅ Leave Requested")
 
 # ✅ ADMIN APPROVAL
 if role == "admin":
-    st.subheader("✅ Leave Approval Panel")
+    st.subheader("✅ Leave Approval")
 
     try:
         leave_df = pd.read_csv("leave_requests.csv")
@@ -225,15 +240,15 @@ if role == "admin":
         for i, row in leave_df.iterrows():
             st.write(row)
 
-            col1, col2 = st.columns(2)
+            c1, c2 = st.columns(2)
 
-            with col1:
+            with c1:
                 if st.button(f"Approve {i}"):
-                    leave_df.at[i, "Status"] = "Approved"
+                    leave_df.at[i,"Status"] = "Approved"
 
-            with col2:
+            with c2:
                 if st.button(f"Reject {i}"):
-                    leave_df.at[i, "Status"] = "Rejected"
+                    leave_df.at[i,"Status"] = "Rejected"
 
         leave_df.to_csv("leave_requests.csv", index=False)
 
@@ -245,19 +260,19 @@ st.subheader("📅 Monthly Report")
 
 try:
     df["Date"] = pd.to_datetime(df["Date"])
+
     months = df["Date"].dt.to_period("M").astype(str).unique()
 
-    selected_month = st.selectbox("Select Month", months)
+    month = st.selectbox("Select Month", months)
 
-    monthly_df = df[df["Date"].dt.to_period("M").astype(str) == selected_month]
+    mdf = df[df["Date"].dt.to_period("M").astype(str) == month]
 
-    st.dataframe(monthly_df)
+    st.dataframe(mdf)
 
     st.download_button(
-        "📥 Download Monthly Report",
-        monthly_df.to_csv(index=False),
-        file_name=f"attendance_{selected_month}.csv"
-    )
-
+        "📥 Download Monthly",
+        mdf.to_csv(index=False),
+        file_name=f"attendance_{month}.csv"
+)
 except:
-    st.info("No monthly data")
+    st.info("No data")
