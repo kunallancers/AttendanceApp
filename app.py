@@ -2,108 +2,156 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# Page title
+st.set_page_config(page_title="Attendance App", layout="centered")
+
 st.title("📊 Attendance Management System")
 
-# ✅ Load Employee Master (file must be in same folder)
+# ✅ Load Employees
 try:
     df_emp = pd.read_excel("employees.xlsx")
     employees = df_emp["Employee Name"].dropna().tolist()
 except:
-    st.error("❌ Employee file not found! Make sure 'employees.xlsx' is in the folder.")
+    st.error("❌ employees.xlsx not found")
     st.stop()
 
-# ✅ Input Fields
+# ✅ Inputs
 date = st.date_input("Select Date")
 employee = st.selectbox("Employee Name", employees)
 
-login = st.time_input("Login Time")
-logout = st.time_input("Logout Time")
+attendance_type = st.selectbox(
+    "Attendance Type",
+    ["Present WFO", "Present WFH", "Half Day", "Leave"]
+)
 
-# ✅ Save Attendance
-if st.button("Save Attendance"):
+# ✅ Load/Create Data
+file_name = "attendance.csv"
 
-    if login and logout:
-        login_dt = datetime.combine(date, login)
-        logout_dt = datetime.combine(date, logout)
+try:
+    df = pd.read_csv(file_name)
+except:
+    df = pd.DataFrame(columns=[
+        "Date", "Employee", "Login", "Logout", "Working Hours", "Status", "Type"
+    ])
 
-        # ✅ Validation
-        if logout_dt < login_dt:
-            st.error("❌ Logout time cannot be before login time")
-            st.stop()
+# ✅ FIND EXISTING RECORD
+existing_index = df[
+    (df["Date"] == str(date)) &
+    (df["Employee"] == employee)
+].index
 
-        hours = (logout_dt - login_dt).seconds / 3600
+# ✅ BUTTON SECTION (IMPORTANT UI FIX)
+col1, col2, col3 = st.columns(3)
 
-        if hours >= 8:
-            status = "Present"
-        elif hours > 0:
-            status = "Half Day"
+with col1:
+    if st.button("🟢 Login Now"):
+        current_time = datetime.now().strftime("%H:%M:%S")
+
+        if len(existing_index) > 0:
+            idx = existing_index[0]
+
+            if df.at[idx, "Login"] == "" or pd.isna(df.at[idx, "Login"]):
+                df.at[idx, "Login"] = current_time
+                df.at[idx, "Status"] = "In Progress"
+                df.at[idx, "Type"] = attendance_type
+                st.success(f"✅ Login at {current_time}")
+            else:
+                st.warning("⚠️ Login already done")
+
         else:
-            status = "Absent"
-    else:
-        hours = 0
-        status = "Absent"
+            new_row = {
+                "Date": str(date),
+                "Employee": employee,
+                "Login": current_time,
+                "Logout": "",
+                "Working Hours": "",
+                "Status": "In Progress",
+                "Type": attendance_type
+            }
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            st.success(f"✅ Login at {current_time}")
 
-    new_data = pd.DataFrame([{
-        "Date": str(date),
-        "Employee": employee,
-        "Login": str(login),
-        "Logout": str(logout),
-        "Working Hours": round(hours, 2),
-        "Status": status
-    }])
+        df.to_csv(file_name, index=False)
 
-    file_name = "attendance.csv"
 
-    # ✅ Prevent duplicate entry
-    try:
-        existing = pd.read_csv(file_name)
+with col2:
+    if st.button("🔴 Logout Now"):
+        current_time = datetime.now().strftime("%H:%M:%S")
 
-        duplicate = (
-            (existing["Date"] == str(date)) &
-            (existing["Employee"] == employee)
-        )
+        if len(existing_index) > 0:
+            idx = existing_index[0]
 
-        if duplicate.any():
-            st.error("❌ Attendance already marked for this employee on this date!")
+            if df.at[idx, "Login"] == "":
+                st.error("❌ Please login first")
+
+            elif df.at[idx, "Logout"] == "" or pd.isna(df.at[idx, "Logout"]):
+
+                df.at[idx, "Logout"] = current_time
+
+                try:
+                    login_time = pd.to_datetime(df.at[idx, "Login"])
+                    logout_time = pd.to_datetime(current_time)
+
+                    hours = (logout_time - login_time).total_seconds() / 3600
+                    df.at[idx, "Working Hours"] = round(hours, 2)
+
+                    if attendance_type == "Leave":
+                        status = "Leave"
+                    elif attendance_type == "Half Day":
+                        status = "Half Day"
+                    elif hours >= 8:
+                        status = "Present"
+                    else:
+                        status = "Half Day"
+
+                    df.at[idx, "Status"] = status
+                    df.at[idx, "Type"] = attendance_type
+
+                    st.success(f"✅ Logout at {current_time}")
+
+                except:
+                    st.error("❌ Error calculating hours")
+
+            else:
+                st.warning("⚠️ Already logged out")
+
         else:
-            updated = pd.concat([existing, new_data], ignore_index=True)
-            updated.to_csv(file_name, index=False)
-            st.success("✅ Attendance Saved Successfully!")
-            st.dataframe(updated)
+            st.error("❌ Login not found")
 
-    except:
-        new_data.to_csv(file_name, index=False)
-        st.success("✅ Attendance Saved Successfully!")
-        st.dataframe(new_data)
+        df.to_csv(file_name, index=False)
 
-# ✅ Show Attendance Data
+
+with col3:
+    if st.button("✅ Mark Without Login"):
+        if attendance_type in ["Leave", "Half Day"]:
+            new_row = {
+                "Date": str(date),
+                "Employee": employee,
+                "Login": "",
+                "Logout": "",
+                "Working Hours": "",
+                "Status": attendance_type,
+                "Type": attendance_type
+            }
+
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            df.to_csv(file_name, index=False)
+
+            st.success(f"✅ {attendance_type} marked")
+        else:
+            st.warning("⚠️ Use Login/Logout for WFO/WFH")
+
+
+# ✅ DISPLAY DATA
 st.subheader("📋 Attendance Records")
 
 try:
-    df = pd.read_csv("attendance.csv")
-
-    # ✅ Filters
-    selected_employee = st.selectbox("Filter by Employee", ["All"] + list(df["Employee"].unique()))
-    
-    if selected_employee != "All":
-        df = df[df["Employee"] == selected_employee]
-
+    df = pd.read_csv(file_name)
     st.dataframe(df)
 
-    # ✅ Download Report
     st.download_button(
-        "📥 Download Attendance Report",
+        "📥 Download Report",
         df.to_csv(index=False),
         file_name="attendance_report.csv"
     )
-
-    # ✅ Summary
-    st.subheader("📊 Summary")
-    st.write("Total Records:", len(df))
-    st.write("Present:", (df["Status"] == "Present").sum())
-    st.write("Half Day:", (df["Status"] == "Half Day").sum())
-    st.write("Absent:", (df["Status"] == "Absent").sum())
-
 except:
-    st.info("No attendance data available yet.")
+    st.info("No attendance data yet")

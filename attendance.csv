@@ -1,2 +1,5 @@
-Date,Employee,Login,Logout,Working Hours,Status
-2026-05-01,ABHIMANYU RAI,09:30:00,17:30:00,8.0,Present
+Date,Employee,Login,Logout,Working Hours,Status,Type
+2026-05-01,ABHIMANYU RAI,09:30:00,17:30:00,8.0,Present,
+2026-05-14,ABHIMANYU RAI,13:32:54,13:33:00,0.0,Half Day,Present WFO
+2026-05-14,Shivani Singh,13:38:22,13:38:53,0.01,Half Day,Present WFH
+2026-05-14,SUSHIL KUMAR,13:42:39,13:42:50,0.0,Half Day,Present WFO
