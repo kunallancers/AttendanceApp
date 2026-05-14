@@ -2,32 +2,38 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="Attendance App", layout="centered")
+st.set_page_config(page_title="Attendance System", layout="centered")
 
-# ✅ LOGIN SYSTEM
+# ✅ USER LOGIN DATA
 users = {
-    "admin": "admin123",
-    "kunal": "1234"
+    "admin": {"password": "admin123", "role": "admin"},
+    "kunal": {"password": "1234", "role": "employee"},
+    "rahul": {"password": "1234", "role": "employee"}
 }
 
+# ✅ LOGIN PANEL
 st.sidebar.title("🔐 Login")
 username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password", type="password")
 
 if st.sidebar.button("Login"):
-    if username in users and users[username] == password:
+    if username in users and users[username]["password"] == password:
         st.session_state["logged_in"] = True
-        st.success(f"Welcome {username}")
+        st.session_state["user"] = username
+        st.session_state["role"] = users[username]["role"]
+        st.success(f"✅ Welcome {username}")
     else:
-        st.error("Invalid credentials")
+        st.error("❌ Invalid credentials")
 
 if "logged_in" not in st.session_state:
     st.stop()
 
-# ✅ MAIN APP
+# ✅ ROLE
+role = st.session_state["role"]
+
 st.title("📊 Attendance Management System")
 
-# ✅ Load Employees
+# ✅ LOAD EMPLOYEES
 try:
     df_emp = pd.read_excel("employees.xlsx")
     employees = df_emp["Employee Name"].dropna().tolist()
@@ -36,7 +42,12 @@ except:
     st.stop()
 
 date = st.date_input("Select Date")
-employee = st.selectbox("Employee Name", employees)
+
+# ✅ Employee Restriction
+if role == "employee":
+    employee = st.session_state["user"]
+else:
+    employee = st.selectbox("Employee Name", employees)
 
 attendance_type = st.selectbox(
     "Attendance Type",
@@ -57,7 +68,7 @@ existing_index = df[
     (df["Employee"] == employee)
 ].index
 
-# ✅ BUTTONS
+# ✅ BUTTONS (LOGIN / LOGOUT / MARK)
 col1, col2, col3 = st.columns(3)
 
 # LOGIN
@@ -67,13 +78,13 @@ with col1:
 
         if len(existing_index) > 0:
             idx = existing_index[0]
-            if pd.isna(df.at[idx, "Login"]) or df.at[idx, "Login"] == "":
+            if df.at[idx, "Login"] == "" or pd.isna(df.at[idx, "Login"]):
                 df.at[idx, "Login"] = current_time
                 df.at[idx, "Status"] = "In Progress"
                 df.at[idx, "Type"] = attendance_type
-                st.success(f"Login at {current_time}")
+                st.success(f"✅ Login at {current_time}")
             else:
-                st.warning("Already logged in")
+                st.warning("⚠️ Already logged in")
         else:
             new_row = {
                 "Date": str(date),
@@ -85,7 +96,7 @@ with col1:
                 "Type": attendance_type
             }
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            st.success(f"Login at {current_time}")
+            st.success(f"✅ Login at {current_time}")
 
         df.to_csv(file_name, index=False)
 
@@ -98,9 +109,9 @@ with col2:
             idx = existing_index[0]
 
             if df.at[idx, "Login"] == "":
-                st.error("Login first")
+                st.error("❌ Login first")
 
-            elif pd.isna(df.at[idx, "Logout"]) or df.at[idx, "Logout"] == "":
+            elif df.at[idx, "Logout"] == "" or pd.isna(df.at[idx, "Logout"]):
                 df.at[idx, "Logout"] = current_time
 
                 login_time = pd.to_datetime(df.at[idx, "Login"])
@@ -121,12 +132,12 @@ with col2:
                 df.at[idx, "Status"] = status
                 df.at[idx, "Type"] = attendance_type
 
-                st.success(f"Logout at {current_time}")
+                st.success(f"✅ Logout at {current_time}")
 
             else:
-                st.warning("Already logged out")
+                st.warning("⚠️ Already logged out")
         else:
-            st.error("No login found")
+            st.error("❌ No login found")
 
         df.to_csv(file_name, index=False)
 
@@ -147,30 +158,28 @@ with col3:
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(file_name, index=False)
 
-            st.success(f"{attendance_type} marked")
+            st.success(f"✅ {attendance_type} marked")
         else:
-            st.warning("Use login/logout for WFO/WFH")
+            st.warning("⚠️ Use login/logout for WFO/WFH")
 
 # ✅ TABLE
 st.subheader("📋 Attendance Records")
-
 try:
     df = pd.read_csv(file_name)
     st.dataframe(df)
 
     st.download_button(
-        "📥 Download Report",
+        "📥 Download Full Report",
         df.to_csv(index=False),
         file_name="attendance_report.csv"
     )
-
 except:
-    st.info("No data")
+    st.info("No attendance data")
 
-# ✅ DASHBOARD
-st.subheader("📊 Dashboard")
+# ✅ DASHBOARD (ADMIN ONLY)
+if role == "admin":
+    st.subheader("📊 Dashboard")
 
-try:
     present = (df["Status"] == "Present").sum()
     leave = (df["Status"] == "Leave").sum()
     half = (df["Status"] == "Half Day").sum()
@@ -182,19 +191,60 @@ try:
 
     st.bar_chart(chart_df.set_index("Type"))
 
-    st.write(f"✅ Present: {present}")
-    st.write(f"📅 Leave: {leave}")
-    st.write(f"⏳ Half Day: {half}")
+# ✅ LEAVE REQUEST
+st.subheader("📩 Leave Request")
 
-except:
-    st.info("No dashboard data")
+if role == "employee":
+    reason = st.text_input("Reason for leave")
+
+    if st.button("Submit Leave Request"):
+        leave_data = {
+            "Employee": employee,
+            "Date": str(date),
+            "Reason": reason,
+            "Status": "Pending"
+        }
+
+        try:
+            leave_df = pd.read_csv("leave_requests.csv")
+        except:
+            leave_df = pd.DataFrame(columns=["Employee","Date","Reason","Status"])
+
+        leave_df = pd.concat([leave_df, pd.DataFrame([leave_data])])
+        leave_df.to_csv("leave_requests.csv", index=False)
+
+        st.success("✅ Leave Requested")
+
+# ✅ ADMIN APPROVAL
+if role == "admin":
+    st.subheader("✅ Leave Approval Panel")
+
+    try:
+        leave_df = pd.read_csv("leave_requests.csv")
+
+        for i, row in leave_df.iterrows():
+            st.write(row)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button(f"Approve {i}"):
+                    leave_df.at[i, "Status"] = "Approved"
+
+            with col2:
+                if st.button(f"Reject {i}"):
+                    leave_df.at[i, "Status"] = "Rejected"
+
+        leave_df.to_csv("leave_requests.csv", index=False)
+
+    except:
+        st.info("No leave requests")
 
 # ✅ MONTHLY REPORT
 st.subheader("📅 Monthly Report")
 
 try:
     df["Date"] = pd.to_datetime(df["Date"])
-
     months = df["Date"].dt.to_period("M").astype(str).unique()
 
     selected_month = st.selectbox("Select Month", months)
