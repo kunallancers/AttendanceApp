@@ -1,278 +1,268 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+import datetime
 
-st.set_page_config(page_title="Attendance System", layout="centered")
+# ✅ SESSION INIT
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
 
-# ✅ LOAD EMPLOYEES EXCEL
+# ✅ PAGE CONFIG
+st.set_page_config(page_title="Attendance System", layout="wide")
+
+# ✅ LOAD EMPLOYEES
 try:
     df_emp = pd.read_excel("employees.xlsx")
+    df_emp.columns = df_emp.columns.str.strip()
 except:
     st.error("❌ employees.xlsx not found")
     st.stop()
 
-# ✅ CREATE USERS AUTO FROM EXCEL
+# ✅ CREATE USERS AUTO
 users = {
-    "admin": {
-        "password": "admin123",
-        "role": "admin",
-        "employee_name": "ADMIN"
-    }
+    "admin": {"password": "admin123", "role": "admin", "employee": "ADMIN"}
 }
 
 for _, row in df_emp.iterrows():
-    emp_name = row["Employee Name"]
-    password = str(row["Password"])
-
-    username = emp_name.split()[0].lower()
+    name = str(row["Employee Name"]).strip()
+    pwd = str(row["Password"]).strip()
+    username = name.split()[0].lower()
 
     users[username] = {
-        "password": password,
+        "password": pwd,
         "role": "employee",
-        "employee_name": emp_name
+        "employee": name
     }
 
-# ✅ LOGIN SYSTEM
-st.sidebar.title("🔐 Login")
+# ✅ LOGIN PAGE
+if not st.session_state["logged_in"]:
 
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
+    st.title("🔐 Login")
 
-if st.sidebar.button("Login"):
-    if username in users and users[username]["password"] == password:
-        st.session_state["logged_in"] = True
-        st.session_state["user"] = username
-        st.session_state["role"] = users[username]["role"]
-        st.session_state["employee_name"] = users[username]["employee_name"]
-        st.success(f"✅ Welcome {username}")
-    else:
-        st.error("❌ Invalid credentials")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-if "logged_in" not in st.session_state:
+    if st.button("Login"):
+        if username in users and users[username]["password"] == password:
+            st.session_state.update({
+                "logged_in": True,
+                "user": username,
+                "role": users[username]["role"],
+                "employee": users[username]["employee"]
+            })
+            st.rerun()
+        else:
+            st.error("❌ Invalid login")
+
     st.stop()
 
-# ✅ ROLE SETUP
+# ✅ LOGOUT
+if st.button("Logout"):
+    st.session_state.clear()
+    st.rerun()
+
 role = st.session_state["role"]
 
-st.title("📊 Attendance Management System")
-
-date = st.date_input("Select Date")
-
-# ✅ EMPLOYEE CONTROL
-employees = df_emp["Employee Name"].dropna().tolist()
-
-if role == "employee":
-    employee = st.session_state["employee_name"]
-    st.info(f"Logged in as: {employee}")
-else:
-    employee = st.selectbox("Employee Name", employees)
-
-attendance_type = st.selectbox(
-    "Attendance Type",
-    ["Present WFO", "Present WFH", "Half Day", "Leave"]
-)
-
-file_name = "attendance.csv"
-
+# ✅ LOAD ATTENDANCE
 try:
-    df = pd.read_csv(file_name)
+    df = pd.read_csv("attendance.csv")
 except:
     df = pd.DataFrame(columns=[
         "Date","Employee","Login","Logout","Working Hours","Status","Type"
     ])
 
+# ✅ LOAD LEAVE
+try:
+    leave_df = pd.read_csv("leave_requests.csv")
+except:
+    leave_df = pd.DataFrame(columns=["Employee","Date","Reason","Status"])
+
+# ✅ HEADER
+st.title("📊 Attendance Dashboard")
+st.write(f"👋 Welcome, {st.session_state['employee']}")
+
+# ✅ INPUT
+date = st.date_input("Select Date", datetime.date.today())
+
+if role == "employee":
+    employee = st.session_state["employee"]
+else:
+    employee = st.selectbox("Employee", df_emp["Employee Name"])
+
+attendance_type = st.selectbox(
+    "Attendance Type",
+    ["Present WFO","Present WFH","Half Day","Leave"]
+)
+
+# ✅ EXISTING RECORD
 existing = df[
     (df["Date"] == str(date)) &
     (df["Employee"] == employee)
 ].index
 
-# ✅ BUTTONS
-col1, col2, col3 = st.columns(3)
+# ✅ ATTENDANCE BUTTONS
+col1, col2 = st.columns(2)
 
-# ✅ LOGIN BUTTON
+# ✅ LOGIN ATTENDANCE
 with col1:
-    if st.button("🟢 Login Now"):
-        now = datetime.now().strftime("%H:%M:%S")
+    if st.button("🟢 Login Attendance"):
+
+        now = datetime.datetime.now().strftime("%H:%M:%S")
 
         if len(existing) > 0:
             idx = existing[0]
-            if pd.isna(df.at[idx, "Login"]) or df.at[idx, "Login"] == "":
-                df.at[idx, "Login"] = now
-                df.at[idx, "Status"] = "In Progress"
-                df.at[idx, "Type"] = attendance_type
-                st.success(f"✅ Login at {now}")
+            if df.at[idx,"Login"] != "":
+                st.warning("Already logged in")
             else:
-                st.warning("Already Logged In")
+                df.at[idx,"Login"] = now
         else:
-            new = {
+            df = pd.concat([df, pd.DataFrame([{
                 "Date": str(date),
                 "Employee": employee,
                 "Login": now,
-                "Logout": "",
-                "Working Hours": "",
-                "Status": "In Progress",
-                "Type": attendance_type
-            }
-            df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
-            st.success(f"✅ Login at {now}")
+                "Logout":"",
+                "Working Hours":"",
+                "Status":"In Progress",
+                "Type":attendance_type
+            }])], ignore_index=True)
 
-        df.to_csv(file_name, index=False)
+        df.to_csv("attendance.csv", index=False)
+        st.success("✅ Login marked")
 
-# ✅ LOGOUT
+# ✅ LOGOUT ATTENDANCE
 with col2:
-    if st.button("🔴 Logout Now"):
-        now = datetime.now().strftime("%H:%M:%S")
+    if st.button("🔴 Logout Attendance"):
+
+        now = datetime.datetime.now().strftime("%H:%M:%S")
 
         if len(existing) > 0:
             idx = existing[0]
 
-            if df.at[idx, "Login"] == "":
+            if df.at[idx,"Login"] == "":
                 st.error("Login first")
 
-            elif pd.isna(df.at[idx, "Logout"]) or df.at[idx, "Logout"] == "":
-                df.at[idx, "Logout"] = now
+            elif df.at[idx,"Logout"] != "":
+                st.warning("Already logged out")
 
-                login_time = pd.to_datetime(df.at[idx, "Login"])
-                logout_time = pd.to_datetime(now)
+            else:
+                df.at[idx,"Logout"] = now
 
-                hrs = (logout_time - login_time).total_seconds()/3600
-                df.at[idx, "Working Hours"] = round(hrs,2)
+                hrs = (pd.to_datetime(now) - pd.to_datetime(df.at[idx,"Login"])).total_seconds()/3600
+                df.at[idx,"Working Hours"] = round(hrs,2)
 
-                if attendance_type == "Leave":
-                    status = "Leave"
-                elif attendance_type == "Half Day":
-                    status = "Half Day"
-                elif hrs >= 8:
+                if hrs >= 8:
                     status = "Present"
                 else:
                     status = "Half Day"
 
-                df.at[idx, "Status"] = status
-                df.at[idx, "Type"] = attendance_type
+                if attendance_type == "Leave":
+                    status = "Leave"
 
-                st.success(f"✅ Logout at {now}")
+                df.at[idx,"Status"] = status
+                df.at[idx,"Type"] = attendance_type
 
-            else:
-                st.warning("Already logged out")
-        else:
-            st.error("No login found")
+        df.to_csv("attendance.csv", index=False)
+        st.success("✅ Logout marked")
 
-        df.to_csv(file_name, index=False)
+# ✅ LEAVE REQUEST SECTION
+st.subheader("📩 Leave System")
 
-# ✅ MARK WITHOUT LOGIN
-with col3:
-    if st.button("✅ Mark Without Login"):
-        if attendance_type in ["Leave", "Half Day"]:
-            new = {
-                "Date": str(date),
-                "Employee": employee,
-                "Login": "",
-                "Logout": "",
-                "Working Hours": "",
-                "Status": attendance_type,
-                "Type": attendance_type
-            }
-            df = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
-            df.to_csv(file_name, index=False)
-
-            st.success(f"✅ {attendance_type} marked")
-        else:
-            st.warning("Use Login for WFO/WFH")
-
-# ✅ TABLE
-st.subheader("📋 Attendance Records")
-
-df = pd.read_csv(file_name)
-st.dataframe(df)
-
-st.download_button(
-    "📥 Download Report",
-    df.to_csv(index=False),
-    file_name="attendance_report.csv"
-)
-
-# ✅ DASHBOARD (ADMIN ONLY)
-if role == "admin":
-    st.subheader("📊 Dashboard")
-
-    p = (df["Status"] == "Present").sum()
-    l = (df["Status"] == "Leave").sum()
-    h = (df["Status"] == "Half Day").sum()
-
-    chart = pd.DataFrame({
-        "Type":["Present","Leave","Half Day"],
-        "Count":[p,l,h]
-    })
-
-    st.bar_chart(chart.set_index("Type"))
-
-# ✅ LEAVE REQUEST
-st.subheader("📩 Leave Request")
-
+# ---------------- EMPLOYEE ----------------
 if role == "employee":
-    reason = st.text_input("Leave Reason")
 
-    if st.button("Submit Leave"):
-        try:
-            leave_df = pd.read_csv("leave_requests.csv")
-        except:
-            leave_df = pd.DataFrame(columns=["Employee","Date","Reason","Status"])
+    reason = st.text_input("Enter reason")
 
-        new_leave = {
-            "Employee": employee,
-            "Date": str(date),
-            "Reason": reason,
-            "Status": "Pending"
-        }
+    existing_leave = leave_df[
+        (leave_df["Employee"] == employee) &
+        (leave_df["Date"] == str(date))
+    ]
 
-        leave_df = pd.concat([leave_df, pd.DataFrame([new_leave])])
-        leave_df.to_csv("leave_requests.csv", index=False)
+    if st.button("Submit Leave Request"):
 
-        st.success("✅ Leave Requested")
+        if not existing_leave.empty:
+            st.warning("Leave already requested")
 
-# ✅ ADMIN APPROVAL
+        else:
+            new = {
+                "Employee": employee,
+                "Date": str(date),
+                "Reason": reason,
+                "Status": "Pending"
+            }
+
+            leave_df = pd.concat([leave_df, pd.DataFrame([new])], ignore_index=True)
+            leave_df.to_csv("leave_requests.csv", index=False)
+
+            st.success("✅ Leave requested")
+
+    st.write("Your Requests")
+    st.dataframe(leave_df[leave_df["Employee"] == employee])
+
+# ---------------- ADMIN ----------------
 if role == "admin":
-    st.subheader("✅ Leave Approval")
 
-    try:
-        leave_df = pd.read_csv("leave_requests.csv")
+    st.subheader("✅ Pending Approvals")
 
-        for i, row in leave_df.iterrows():
-            st.write(row)
+    pending = leave_df[leave_df["Status"] == "Pending"]
+
+    if not pending.empty:
+
+        for i, row in pending.iterrows():
+
+            st.write(f"{row['Employee']} | {row['Date']} | {row['Reason']}")
 
             c1, c2 = st.columns(2)
 
+            # APPROVE
             with c1:
                 if st.button(f"Approve {i}"):
+
                     leave_df.at[i,"Status"] = "Approved"
 
+                    # AUTO ATTENDANCE
+                    new_row = {
+                        "Date": row["Date"],
+                        "Employee": row["Employee"],
+                        "Login":"",
+                        "Logout":"",
+                        "Working Hours":"",
+                        "Status":"Leave",
+                        "Type":"Leave"
+                    }
+
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                    df.to_csv("attendance.csv", index=False)
+
+                    st.success("✅ Approved")
+
+            # REJECT
             with c2:
                 if st.button(f"Reject {i}"):
                     leave_df.at[i,"Status"] = "Rejected"
 
         leave_df.to_csv("leave_requests.csv", index=False)
 
-    except:
-        st.info("No leave requests")
+    else:
+        st.info("No pending leave requests")
 
-# ✅ MONTHLY REPORT
-st.subheader("📅 Monthly Report")
+# ✅ ATTENDANCE TABLE
+st.subheader("📋 Attendance Records")
+st.dataframe(df)
 
-try:
-    df["Date"] = pd.to_datetime(df["Date"])
-
-    months = df["Date"].dt.to_period("M").astype(str).unique()
-
-    month = st.selectbox("Select Month", months)
-
-    mdf = df[df["Date"].dt.to_period("M").astype(str) == month]
-
-    st.dataframe(mdf)
-
-    st.download_button(
-        "📥 Download Monthly",
-        mdf.to_csv(index=False),
-        file_name=f"attendance_{month}.csv"
+# ✅ DOWNLOAD
+st.download_button(
+    "📥 Download Report",
+    df.to_csv(index=False),
+    file_name="attendance.csv"
 )
-except:
-    st.info("No data")
+
+# ✅ ADMIN RESET
+if role == "admin":
+
+    st.subheader("⚙️ Admin Controls")
+
+    confirm = st.checkbox("Confirm delete")
+
+    if confirm:
+        if st.button("Clear Attendance"):
+            pd.DataFrame(columns=df.columns).to_csv("attendance.csv", index=False)
+            st.success("✅ Cleared")
