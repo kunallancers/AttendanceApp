@@ -1,0 +1,15 @@
+# ✅ Ignore secrets
+credentials.json
+*.json
+
+# ✅ Python cache files
+__pycache__/
+
+# ✅ Environment files
+.env
+
+# ✅ Temporary files
+*.log
+*.tmp
+
+.streamlit/secrets.toml
