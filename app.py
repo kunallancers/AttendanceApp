@@ -1,10 +1,39 @@
 import streamlit as st
+from streamlit_geolocation import streamlit_geolocation
+import streamlit.components.v1 as components
+
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, date, timezone
 import pytz
 import os
+# ✅ Initialize session for location
+if "location" not in st.session_state:
+    st.session_state["location"] = None
+
+
+# ✅ Function to fetch location
+def get_location():
+    location_js = """
+    <script>
+    function sendLocation() {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const data = lat + "," + lon;
+                window.parent.postMessage(data, "*");
+            }
+        );
+    }
+    sendLocation();
+    </script>
+    """
+
+    components.html(location_js, height=0)
+    
+# ✅ Save location
 
 # ============================================================
 # ✅ PAGE CONFIG
@@ -185,13 +214,43 @@ employee = st.session_state["employee"]
 # ✅ HEADER
 # ============================================================
 st.title("📊 Attendance Dashboard")
-
 st.write(f"👋 Welcome: {employee}")
+# ✅ Get location using component
+location = streamlit_geolocation()
 
-st.write(
-    "🕒 Current IST Time:",
-    get_ist().strftime("%Y-%m-%d %H:%M:%S")
-)
+if location:
+    if location.get("latitude") and location.get("longitude"):
+        lat = str(location["latitude"])
+        lon = str(location["longitude"])
+        st.session_state["location"] = f"{lat},{lon}"
+    else:
+        lat, lon = "NA", "NA"
+else:
+    lat, lon = "NA", "NA"
+st.write("📍 Current Location:")
+st.write(f"Latitude: {lat}")
+st.write(f"Longitude: {lon}")
+if lat != "NA" and lon != "NA":
+    st.markdown(f"https://www.google.com/maps?q={lat},{lon}")
+# ✅ Trigger location capture
+get_location()
+
+# ✅ Show captured location
+loc = st.session_state.get("location", "NA,NA")
+
+try:
+    lat, lon = loc.split(",")
+except:
+    lat, lon = "NA", "NA"
+
+st.write("📍 Current Location:")
+st.write(f"Latitude: {lat}")
+st.write(f"Longitude: {lon}")
+
+# ✅ Google Maps link
+if lat != "NA" and lon != "NA":
+    map_url = f"https://www.google.com/maps?q={lat},{lon}"
+    st.markdown(f"[📍 Open in Google Maps]({map_url})")
 
 # ============================================================
 # ✅ DATE SELECTION
@@ -251,8 +310,15 @@ with col1:
 
     if st.button("🟢 Login Attendance"):
 
-        sheet, _ = connect_sheet()
+        # ✅ Get location
+        loc = st.session_state.get("location", "NA,NA")
 
+        try:
+            lat, lon = loc.split(",")
+        except:
+            lat, lon = "NA", "NA"
+
+        sheet, _ = connect_sheet()
         df = load_attendance()
 
         now = get_ist().strftime("%Y-%m-%d %H:%M:%S")
@@ -262,7 +328,7 @@ with col1:
             (df["Employee"] == employee)
         )
 
-        if mask.any():
+        if not df.empty and mask.any():
 
             idx = df[mask].index[0]
 
@@ -275,8 +341,11 @@ with col1:
             row_number = idx + 2
 
             sheet.update_cell(row_number, 3, now)
-
             sheet.update_cell(row_number, 6, "In Progress")
+
+            # ✅ Optional: update location for existing row
+            sheet.update_cell(row_number, 8, lat)
+            sheet.update_cell(row_number, 9, lon)
 
         else:
 
@@ -287,12 +356,14 @@ with col1:
                 "",
                 "",
                 "In Progress",
-                attendance_type
+                attendance_type,
+                lat,   # ✅ NEW
+                lon    # ✅ NEW
             ]
 
             sheet.append_row(new_row)
 
-        st.success("✅ Login Recorded")
+        st.success("✅ Login Recorded with Location")
 
 # ============================================================
 # ✅ LOGOUT ATTENDANCE
@@ -301,57 +372,71 @@ with col2:
 
     if st.button("🔴 Logout Attendance"):
 
-        sheet, _ = connect_sheet()
+        # ✅ Get location
+        loc = st.session_state.get("location", "NA,NA")
 
+        try:
+            lat, lon = loc.split(",")
+        except:
+            lat, lon = "NA", "NA"
+
+        sheet, _ = connect_sheet()
         df = load_attendance()
 
-        now = get_ist().strftime("%Y-%m-%d %H:%M:%S")
+        now_dt = get_ist()
+        now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        match = df[
-            (df["Employee"] == employee) &
-            (df["Date"] == date_str)
-        ]
-
-        if match.empty:
-            st.error("❌ No Login Record Found")
-            st.stop()
-
-        idx = match.index[0]
-
-        login_val = match.iloc[0]["Login"]
-
-        logout_val = match.iloc[0]["Logout"]
-
-        if pd.isna(login_val) or str(login_val).strip() == "":
-            st.error("❌ Please Login First")
-            st.stop()
-
-        if pd.notna(logout_val) and str(logout_val).strip() != "":
-            st.warning("⚠ Already Logged Out")
-            st.stop()
-
-        login_time = pd.to_datetime(login_val)
-
-        logout_time = pd.to_datetime(now)
-
-        hours = round(
-            (logout_time - login_time).total_seconds() / 3600,
-            2
+        mask = (
+            (df["Date"] == date_str) &
+            (df["Employee"] == employee)
         )
 
-        status = "Present" if hours >= 8 else "Half Day"
+        if not df.empty and mask.any():
 
-        row_number = idx + 2
+            idx = df[mask].index[0]
+            row_number = idx + 2
 
-        sheet.update_cell(row_number, 4, now)
+            login_value = df.at[idx, "Login"]
 
-        sheet.update_cell(row_number, 5, hours)
+            # ✅ Check if logout already exists
+            existing_logout = df.at[idx, "Logout"]
 
-        sheet.update_cell(row_number, 6, status)
+            if pd.notna(existing_logout) and str(existing_logout).strip() != "":
+                st.warning("⚠ Already Logged Out")
+                st.stop()
 
-        st.success(
-            f"✅ Logout Recorded | Working Hours: {hours}"
-        )
+            # ✅ Update logout time
+            sheet.update_cell(row_number, 4, now_str)
+
+            # ✅ Calculate working hours
+            try:
+                login_dt = pd.to_datetime(login_value)
+                hours = (now_dt - login_dt).total_seconds() / 3600
+                hours = round(hours, 2)
+            except:
+                hours = 0
+
+            # ✅ Save working hours
+            sheet.update_cell(row_number, 5, str(hours))
+
+            # ✅ Update status
+            if hours >= 8:
+                status = "Full Day"
+            elif hours >= 4:
+                status = "Half Day"
+            else:
+                status = "Absent"
+
+            sheet.update_cell(row_number, 6, status)
+
+            # ✅ Save logout location
+            sheet.update_cell(row_number, 10, lat)
+            sheet.update_cell(row_number, 11, lon)
+
+            st.success(f"✅ Logout Recorded\n⏱ Hours: {hours} hrs\n📍 Location: {lat}, {lon}")
+
+        else:
+            st.warning("⚠ No login record found")
 
 # ============================================================
 # ✅ CLEAR ATTENDANCE
@@ -604,6 +689,9 @@ if not df.empty:
         errors="coerce"
     ).dt.strftime("%H:%M:%S")
 
+# ✅ Fix column type issues
+if "Working Hours" in df.columns:
+    df["Working Hours"] = df["Working Hours"].astype(str)
     st.dataframe(
         df,
         use_container_width=True
