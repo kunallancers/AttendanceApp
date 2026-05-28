@@ -211,46 +211,57 @@ role = st.session_state["role"]
 employee = st.session_state["employee"]
 
 # ============================================================
-# ✅ HEADER
+# ✅ HEADER + LOCATION (FINAL CLEAN STRUCTURE)
 # ============================================================
 st.title("📊 Attendance Dashboard")
 st.write(f"👋 Welcome: {employee}")
-# ✅ Get location using component
-location = streamlit_geolocation()
 
-if location:
-    if location.get("latitude") and location.get("longitude"):
+# ============================================================
+# ✅ STEP 1: INITIAL LOAD (RUNS FIRST TIME)
+# ============================================================
+if "location" not in st.session_state:
+    location = streamlit_geolocation()
+
+    if location and location.get("latitude") and location.get("longitude"):
         lat = str(location["latitude"])
         lon = str(location["longitude"])
         st.session_state["location"] = f"{lat},{lon}"
-    else:
-        lat, lon = "NA", "NA"
+
+# ============================================================
+# ✅ STEP 2: MAIN LOCATION FETCH (ALWAYS RUNS)
+# ============================================================
+location = streamlit_geolocation()
+
+if location and location.get("latitude") and location.get("longitude"):
+    lat = str(location["latitude"])
+    lon = str(location["longitude"])
+
+    # ✅ Update latest location
+    st.session_state["location"] = f"{lat},{lon}"
+
 else:
-    lat, lon = "NA", "NA"
-st.write("📍 Current Location:")
-st.write(f"Latitude: {lat}")
-st.write(f"Longitude: {lon}")
-if lat != "NA" and lon != "NA":
-    st.markdown(f"https://www.google.com/maps?q={lat},{lon}")
-# ✅ Trigger location capture
-get_location()
+    loc = st.session_state.get("location", "NA,NA")
+    try:
+        lat, lon = loc.split(",")
+    except:
+        lat, lon = "NA", "NA"
 
-# ✅ Show captured location
-loc = st.session_state.get("location", "NA,NA")
-
-try:
-    lat, lon = loc.split(",")
-except:
-    lat, lon = "NA", "NA"
-
+# ============================================================
+# ✅ STEP 3: DISPLAY LOCATION
+# ============================================================
 st.write("📍 Current Location:")
 st.write(f"Latitude: {lat}")
 st.write(f"Longitude: {lon}")
 
 # ✅ Google Maps link
 if lat != "NA" and lon != "NA":
-    map_url = f"https://www.google.com/maps?q={lat},{lon}"
-    st.markdown(f"[📍 Open in Google Maps]({map_url})")
+    st.markdown(f"https://www.google.com/maps?q={lat},{lon}")
+
+# ✅ Status message
+if lat != "NA":
+    st.success("📍 Location captured successfully ✅")
+else:
+    st.warning("⚠ Please allow location access in your browser")
 
 # ============================================================
 # ✅ DATE SELECTION
@@ -310,13 +321,18 @@ with col1:
 
     if st.button("🟢 Login Attendance"):
 
-        # ✅ Get location
-        loc = st.session_state.get("location", "NA,NA")
+        # ✅ Capture fresh location
+        location = streamlit_geolocation()
 
-        try:
-            lat, lon = loc.split(",")
-        except:
-            lat, lon = "NA", "NA"
+        if location and location.get("latitude") and location.get("longitude"):
+            lat = str(location["latitude"])
+            lon = str(location["longitude"])
+        else:
+            loc = st.session_state.get("location", "NA,NA")
+            try:
+                lat, lon = loc.split(",")
+            except:
+                lat, lon = "NA", "NA"
 
         sheet, _ = connect_sheet()
         df = load_attendance()
@@ -340,12 +356,15 @@ with col1:
 
             row_number = idx + 2
 
+            # ✅ Update login time
             sheet.update_cell(row_number, 3, now)
-            sheet.update_cell(row_number, 6, "In Progress")
 
-            # ✅ Optional: update location for existing row
+            # ✅ Save login location
             sheet.update_cell(row_number, 8, lat)
             sheet.update_cell(row_number, 9, lon)
+
+            # ✅ Update status
+            sheet.update_cell(row_number, 6, "In Progress")
 
         else:
 
@@ -357,13 +376,13 @@ with col1:
                 "",
                 "In Progress",
                 attendance_type,
-                lat,   # ✅ NEW
-                lon    # ✅ NEW
+                lat,
+                lon
             ]
 
             sheet.append_row(new_row)
 
-        st.success("✅ Login Recorded with Location")
+        st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
 
 # ============================================================
 # ✅ LOGOUT ATTENDANCE
@@ -372,13 +391,18 @@ with col2:
 
     if st.button("🔴 Logout Attendance"):
 
-        # ✅ Get location
-        loc = st.session_state.get("location", "NA,NA")
+        # ✅ Capture fresh location (same as login)
+        location = streamlit_geolocation()
 
-        try:
-            lat, lon = loc.split(",")
-        except:
-            lat, lon = "NA", "NA"
+        if location and location.get("latitude") and location.get("longitude"):
+            lat = str(location["latitude"])
+            lon = str(location["longitude"])
+        else:
+            loc = st.session_state.get("location", "NA,NA")
+            try:
+                lat, lon = loc.split(",")
+            except:
+                lat, lon = "NA", "NA"
 
         sheet, _ = connect_sheet()
         df = load_attendance()
@@ -397,10 +421,9 @@ with col2:
             row_number = idx + 2
 
             login_value = df.at[idx, "Login"]
-
-            # ✅ Check if logout already exists
             existing_logout = df.at[idx, "Logout"]
 
+            # ✅ Prevent duplicate logout
             if pd.notna(existing_logout) and str(existing_logout).strip() != "":
                 st.warning("⚠ Already Logged Out")
                 st.stop()
