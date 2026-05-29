@@ -233,7 +233,7 @@ st.write(f"👋 Welcome: {employee}")
 # ✅ STEP 1: INITIAL LOAD (RUNS FIRST TIME)
 # ============================================================
 if "location" not in st.session_state:
-    location = streamlit_geolocation(key="header_location"
+    location = streamlit_geolocation()
 
     if location and location.get("latitude") and location.get("longitude"):
         lat = str(location["latitude"])
@@ -243,7 +243,7 @@ if "location" not in st.session_state:
 # ============================================================
 # ✅ STEP 2: MAIN LOCATION FETCH (ALWAYS RUNS)
 # ============================================================
-location = streamlit_geolocation(key="header_location"
+location = streamlit_geolocation()
 
 if location and location.get("latitude") and location.get("longitude"):
     lat = str(location["latitude"])
@@ -334,8 +334,8 @@ with col1:
 
     if st.button("🟢 Login Attendance"):
 
-        # ✅ Capture fresh location
-        location = streamlit_geolocation(key="header_location"
+        # ✅ Fresh location (UNIQUE KEY)
+        location = streamlit_geolocation(key="header_location")
 
         if location and location.get("latitude") and location.get("longitude"):
             lat = str(location["latitude"])
@@ -405,7 +405,7 @@ with col2:
     if st.button("🔴 Logout Attendance"):
 
         # ✅ Capture fresh location (same as login)
-        location = streamlit_geolocation(key="header_location"
+        location = streamlit_geolocation(key="Logout_location")
 
         if location and location.get("latitude") and location.get("longitude"):
             lat = str(location["latitude"])
