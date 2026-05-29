@@ -229,6 +229,8 @@ ADMIN_USERS = ["ADMIN"]
 st.title("📊 Attendance Dashboard")
 st.write(f"👋 Welcome: {employee}")
 
+st.write("✅ Latest version deployed")
+
 # ============================================================
 # ✅ STEP 1: INITIAL LOAD (RUNS FIRST TIME)
 # ============================================================
