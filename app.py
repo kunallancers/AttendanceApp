@@ -8,6 +8,16 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, date, timezone
 import pytz
 import os
+import time
+# ✅ Auto refresh every 5 seconds
+if "last_refresh" not in st.session_state:
+    st.session_state["last_refresh"] = time.time()
+
+current_time = time.time()
+
+if current_time - st.session_state["last_refresh"] > 5:
+    st.session_state["last_refresh"] = current_time
+    st.rerun()
 # ✅ Initialize session for location
 if "location" not in st.session_state:
     st.session_state["location"] = None
@@ -210,6 +220,9 @@ role = st.session_state["role"]
 
 employee = st.session_state["employee"]
 
+# ✅ ADD THIS
+ADMIN_USERS = ["ADMIN"]
+
 # ============================================================
 # ✅ HEADER + LOCATION (FINAL CLEAN STRUCTURE)
 # ============================================================
@@ -220,7 +233,7 @@ st.write(f"👋 Welcome: {employee}")
 # ✅ STEP 1: INITIAL LOAD (RUNS FIRST TIME)
 # ============================================================
 if "location" not in st.session_state:
-    location = streamlit_geolocation()
+    location = streamlit_geolocation(key="header_location"
 
     if location and location.get("latitude") and location.get("longitude"):
         lat = str(location["latitude"])
@@ -230,7 +243,7 @@ if "location" not in st.session_state:
 # ============================================================
 # ✅ STEP 2: MAIN LOCATION FETCH (ALWAYS RUNS)
 # ============================================================
-location = streamlit_geolocation()
+location = streamlit_geolocation(key="header_location"
 
 if location and location.get("latitude") and location.get("longitude"):
     lat = str(location["latitude"])
@@ -322,7 +335,7 @@ with col1:
     if st.button("🟢 Login Attendance"):
 
         # ✅ Capture fresh location
-        location = streamlit_geolocation()
+        location = streamlit_geolocation(key="header_location"
 
         if location and location.get("latitude") and location.get("longitude"):
             lat = str(location["latitude"])
@@ -392,7 +405,7 @@ with col2:
     if st.button("🔴 Logout Attendance"):
 
         # ✅ Capture fresh location (same as login)
-        location = streamlit_geolocation()
+        location = streamlit_geolocation(key="header_location"
 
         if location and location.get("latitude") and location.get("longitude"):
             lat = str(location["latitude"])
