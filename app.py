@@ -776,35 +776,13 @@ else:
     st.info("No attendance records found")
 
 # ============================================================
-# ✅ MONTHLY ATTENDANCE REPORT (CORRECT & COMPLETE)
-# ============================================================
-
-st.subheader("📅 Monthly Attendance Report")
-
-# ✅ Load data
-df = load_attendance()
-
-# ✅ Check if data exists
-if df.empty:
-    st.info("⚠ No attendance data found")
-    st.stop()
-
-# ✅ Ensure Date column exists FIRST
-if "Date" not in df.columns:
-    st.error("❌ Date column missing in data")
-    st.stop()
-
-# ✅ Create Month column (ONLY ONCE ✅)
-df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
-
-
-# ============================================================
 # ✅ FILTER PANEL
 # ============================================================
 
 st.markdown("### 🔍 Filters")
 
 col1, col2 = st.columns(2)
+
 
 with col1:
     selected_month = st.selectbox(
