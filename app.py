@@ -270,7 +270,96 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
+# ============================================================
+# ✅ LOGIN SECTION
+# ============================================================
 
+# ✅ HEADER (Step 1)
+
+st.markdown("""
+<h1 style='text-align: center; color: #2E86C1;'>📊 Attendance Management Dashboard</h1>
+<hr>
+""", unsafe_allow_html=True)
+
+
+# ============================================================
+# ✅ LOGIN SECTION
+# ============================================================
+
+employee_input = st.text_input("Employee ID")
+
+if st.button("Login"):
+    if employee_input:
+        st.session_state["employee"] = employee_input
+
+if "employee" not in st.session_state:
+    st.warning("⚠ Please login to continue")
+    st.stop()
+
+employee = st.session_state["employee"]
+
+st.success(f"✅ Logged in as: {employee}")
+
+
+# ============================================================
+# ✅ GEOLOCATION SECTION
+# ============================================================
+
+location = streamlit_geolocation()
+
+if location:
+    st.success("📍 Location captured successfully ✅")
+    st.write(f"Latitude: {location['latitude']}")
+    st.write(f"Longitude: {location['longitude']}")
+
+
+# ============================================================
+# ✅ MONTHLY REPORT
+# ============================================================
+
+st.subheader("📅 Monthly Attendance Report")
+
+# ✅ Load data
+df = load_attendance()
+
+if df.empty:
+    st.info("⚠ No attendance data found")
+    st.stop()
+
+# ✅ Ensure Date exists
+if "Date" not in df.columns:
+    st.error("❌ Date column missing")
+    st.stop()
+
+# ✅ Create Month column
+df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
+
+# ✅ Filters
+col1, col2 = st.columns(2)
+
+with col1:
+    selected_month = st.selectbox(
+        "📅 Select Month",
+        sorted(df["Month"].dropna().unique(), reverse=True),
+        key="month_filter"
+    )
+
+with col2:
+    search = st.text_input("👤 Search Employee")
+
+# ✅ Filter data
+monthly_df = df[df["Month"] == selected_month]
+
+if search:
+    monthly_df = monthly_df[
+        monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
+    ]
+
+# ✅ Display
+if not monthly_df.empty:
+    st.dataframe(monthly_df, use_container_width=True)
+else:
+    st.info("⚠ No data available for selected month")
 # ============================================================
 # ✅ STEP 1: INITIAL LOAD (RUNS FIRST TIME)
 # ============================================================
@@ -377,7 +466,7 @@ with col1:
     if st.button("🟢 Login Attendance"):
 
         # ✅ Fresh location (UNIQUE KEY)
-        location = streamlit_geolocation(key="header_location")
+        location = streamlit_geolocation()
 
         if location and location.get("latitude") and location.get("longitude"):
             lat = str(location["latitude"])
