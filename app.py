@@ -790,94 +790,65 @@ st.subheader("📅 Monthly Attendance Report")
 # ✅ Load data
 df = load_attendance()
 
-# ✅ Check if data exists FIRST
+# ✅ SAFETY CHECK (VERY IMPORTANT)
 if df.empty:
     st.info("⚠ No attendance data found")
+    st.stop()
+
+# ✅ Ensure Date column exists
+if "Date" not in df.columns:
+    st.error("❌ Date column missing in data")
+    st.stop()
+
+# ✅ ✅ CREATE MONTH COLUMN (MUST BE HERE ✅)
+df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
+
+# ============================================================
+# ✅ FILTERS
+# ============================================================
+st.markdown("### 🔍 Filters")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    selected_month = st.selectbox(
+        "📅 Select Month",
+        sorted(df["Month"].dropna().unique(), reverse=True),
+        key="month_filter"
+    )
+
+with col2:
+    search = st.text_input("👤 Search Employee")
+
+# ✅ FILTER DATA
+monthly_df = df[df["Month"] == selected_month]
+
+# ✅ Apply search
+if search:
+    monthly_df = monthly_df[
+        monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
+    ]
+
+# ============================================================
+# ✅ DISPLAY
+# ============================================================
+if not monthly_df.empty:
+
+    st.markdown("### 📅 Attendance Details")
+
+    st.dataframe(monthly_df, use_container_width=True)
+
+    st.divider()
+
+    st.download_button(
+        label="⬇ Download Monthly Report",
+        data=monthly_df.to_csv(index=False).encode("utf-8"),
+        file_name=f"attendance_{selected_month}.csv",
+        mime="text/csv"
+    )
 
 else:
-    # ✅ Create Month column (VERY IMPORTANT)
-    df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
-
-    # ============================================================
-    # ✅ FILTER PANEL
-    # ============================================================
-    st.markdown("### 🔍 Filters")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        selected_month = st.selectbox(
-            "📅 Select Month",
-            sorted(df["Month"].dropna().unique(), reverse=True),
-            key="month_filter"
-        )
-
-    with col2:
-        search = st.text_input("👤 Search Employee")
-
-    # ✅ Apply filters
-    monthly_df = df[df["Month"] == selected_month]
-
-    if search:
-        monthly_df = monthly_df[
-            monthly_df["Employee"].str.contains(search, case=False, na=False)
-        ]
-
-    st.divider()
-
-    # ============================================================
-    # ✅ SUMMARY (FOR MANAGEMENT ✅)
-    # ============================================================
-    st.markdown("### 📊 Summary")
-
-    total_records = len(monthly_df)
-    full_days = len(monthly_df[monthly_df["Status"] == "Full Day"])
-    half_days = len(monthly_df[monthly_df["Status"] == "Half Day"])
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("📋 Total Records", total_records)
-
-    with col2:
-        st.metric("✅ Full Days", full_days)
-
-    with col3:
-        st.metric("⏱ Half Days", half_days)
-
-    st.divider()
-
-    # ============================================================
-    # ✅ TABLE + DOWNLOAD
-    # ============================================================
-    if not monthly_df.empty:
-
-        st.markdown("### 📅 Attendance Details")
-
-        # ✅ Show limited rows
-        entries = st.selectbox(
-            "Show entries",
-            [10, 25, 50, 100],
-            index=0,
-            key="entries_month"
-        )
-
-        display_df = monthly_df.head(entries)
-
-        st.dataframe(display_df, use_container_width=True)
-
-        st.divider()
-
-        # ✅ Download button
-        st.download_button(
-            label="⬇ Download Monthly Report",
-            data=monthly_df.to_csv(index=False).encode("utf-8"),
-            file_name=f"attendance_{selected_month}.csv",
-            mime="text/csv"
-        )
-
-    else:
-        st.info("⚠ No data available for selected month")
+    st.info("⚠ No data available for selected month")
     
     st.divider()
     # ============================================================
