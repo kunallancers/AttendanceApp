@@ -781,54 +781,94 @@ else:
 # ✅ MONTHLY ATTENDANCE REPORT (COMPLETE)
 # ============================================================
 
+# ============================================================
+# ✅ MONTHLY ATTENDANCE REPORT (COMPLETE)
+# ============================================================
+
 st.subheader("📅 Monthly Attendance Report")
 
 # ✅ Load data
 df = load_attendance()
-df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
-# ✅ Create Month column
-df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
-# ✅ FILTER PANEL UI (STEP 3B)
-st.markdown("### 🔍 Filters")
 
-col1, col2 = st.columns(2)
-with col1:
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        sorted(df["Month"].dropna().unique(), reverse=True),
-        key="month_filter"
-    )
-
-with col2:
-    search = st.text_input("👤 Search Employee")
-    filtered_df = df[df["Month"] == selected_month]
-
-if search:
-    filtered_df = filtered_df[
-        filtered_df["Employee"].str.contains(search, case=False, na=False)
-    ]
-    # ✅ Check overall data
+# ✅ Check if data exists FIRST
 if df.empty:
     st.info("⚠ No attendance data found")
 
 else:
+    # ✅ Create Month column (VERY IMPORTANT)
+    df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
 
-    # ✅ Filter month
+    # ============================================================
+    # ✅ FILTER PANEL
+    # ============================================================
+    st.markdown("### 🔍 Filters")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        selected_month = st.selectbox(
+            "📅 Select Month",
+            sorted(df["Month"].dropna().unique(), reverse=True),
+            key="month_filter"
+        )
+
+    with col2:
+        search = st.text_input("👤 Search Employee")
+
+    # ✅ Apply filters
     monthly_df = df[df["Month"] == selected_month]
 
-    # ✅ Apply search filter
     if search:
         monthly_df = monthly_df[
             monthly_df["Employee"].str.contains(search, case=False, na=False)
         ]
 
-    # ✅ FINAL CHECK BLOCK (ADD HERE ✅)
+    st.divider()
+
+    # ============================================================
+    # ✅ SUMMARY (FOR MANAGEMENT ✅)
+    # ============================================================
+    st.markdown("### 📊 Summary")
+
+    total_records = len(monthly_df)
+    full_days = len(monthly_df[monthly_df["Status"] == "Full Day"])
+    half_days = len(monthly_df[monthly_df["Status"] == "Half Day"])
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("📋 Total Records", total_records)
+
+    with col2:
+        st.metric("✅ Full Days", full_days)
+
+    with col3:
+        st.metric("⏱ Half Days", half_days)
+
+    st.divider()
+
+    # ============================================================
+    # ✅ TABLE + DOWNLOAD
+    # ============================================================
     if not monthly_df.empty:
-        
+
         st.markdown("### 📅 Attendance Details")
 
-        st.dataframe(monthly_df, use_container_width=True)
+        # ✅ Show limited rows
+        entries = st.selectbox(
+            "Show entries",
+            [10, 25, 50, 100],
+            index=0,
+            key="entries_month"
+        )
 
+        display_df = monthly_df.head(entries)
+
+        st.dataframe(display_df, use_container_width=True)
+
+        st.divider()
+
+        # ✅ Download button
         st.download_button(
             label="⬇ Download Monthly Report",
             data=monthly_df.to_csv(index=False).encode("utf-8"),
