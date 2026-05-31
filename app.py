@@ -766,23 +766,17 @@ if not df.empty:
         df["Logout"],
         errors="coerce"
     ).dt.strftime("%H:%M:%S")
-
-# ✅ Fix column type issues
+    
+# ✅ Fix column type issues (safe version)
 if "Working Hours" in df.columns:
     df["Working Hours"] = df["Working Hours"].astype(str)
-    monthly_df = df[df["Month"] == selected_month]
-    st.dataframe(monthly_df, use_container_width=True)
 
 else:
 
     st.info("No attendance records found")
 
 # ============================================================
-# ✅ MONTHLY ATTENDANCE REPORT (COMPLETE)
-# ============================================================
-
-# ============================================================
-# ✅ MONTHLY ATTENDANCE REPORT (COMPLETE)
+# ✅ MONTHLY ATTENDANCE REPORT (CORRECT & COMPLETE)
 # ============================================================
 
 st.subheader("📅 Monthly Attendance Report")
@@ -790,22 +784,24 @@ st.subheader("📅 Monthly Attendance Report")
 # ✅ Load data
 df = load_attendance()
 
-# ✅ SAFETY CHECK (VERY IMPORTANT)
+# ✅ Check if data exists
 if df.empty:
     st.info("⚠ No attendance data found")
     st.stop()
 
-# ✅ Ensure Date column exists
+# ✅ Ensure Date column exists FIRST
 if "Date" not in df.columns:
     st.error("❌ Date column missing in data")
     st.stop()
 
-# ✅ ✅ CREATE MONTH COLUMN (MUST BE HERE ✅)
+# ✅ Create Month column (ONLY ONCE ✅)
 df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
 
+
 # ============================================================
-# ✅ FILTERS
+# ✅ FILTER PANEL
 # ============================================================
+
 st.markdown("### 🔍 Filters")
 
 col1, col2 = st.columns(2)
@@ -820,26 +816,42 @@ with col1:
 with col2:
     search = st.text_input("👤 Search Employee")
 
+
+# ============================================================
 # ✅ FILTER DATA
+# ============================================================
+
 monthly_df = df[df["Month"] == selected_month]
 
-# ✅ Apply search
 if search:
     monthly_df = monthly_df[
         monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
     ]
 
+
 # ============================================================
-# ✅ DISPLAY
+# ✅ DISPLAY DATA
 # ============================================================
+
 if not monthly_df.empty:
 
     st.markdown("### 📅 Attendance Details")
 
-    st.dataframe(monthly_df, use_container_width=True)
+    # ✅ Show limited rows
+    entries = st.selectbox(
+        "Show entries",
+        [10, 25, 50, 100],
+        index=0,
+        key="entries_month"
+    )
+
+    display_df = monthly_df.head(entries)
+
+    st.dataframe(display_df, use_container_width=True)
 
     st.divider()
 
+    # ✅ Download button
     st.download_button(
         label="⬇ Download Monthly Report",
         data=monthly_df.to_csv(index=False).encode("utf-8"),
