@@ -9,6 +9,43 @@ from datetime import datetime, date, timezone
 import pytz
 import os
 import time
+# ============================================================
+# ✅ APP STYLING (BACKGROUND + UI)
+# ============================================================
+
+st.markdown("""
+<style>
+    /* Main background */
+    .stApp {
+        background-color: #F4F6F7;
+    }
+
+    /* Remove padding for top header */
+    .block-container {
+        padding-top: 2rem;
+    }
+
+    /* Style buttons */
+    .stButton > button {
+        background-color: #2E86C1;
+        color: white;
+        border-radius: 8px;
+        padding: 0.5em 1em;
+        border: none;
+    }
+
+    /* Hover effect */
+    .stButton > button:hover {
+        background-color: #1B4F72;
+    }
+
+    /* Selectbox styling */
+    .stSelectbox div {
+        border-radius: 8px;
+    }
+
+</style>
+""", unsafe_allow_html=True)
 # ✅ Auto refresh every 5 seconds
 if "last_refresh" not in st.session_state:
     st.session_state["last_refresh"] = time.time()
@@ -226,10 +263,13 @@ ADMIN_USERS = ["ADMIN"]
 # ============================================================
 # ✅ HEADER + LOCATION (FINAL CLEAN STRUCTURE)
 # ============================================================
-st.title("📊 Attendance Dashboard")
-st.write(f"👋 Welcome: {employee}")
 
-st.write("✅ Latest version deployed")
+st.markdown("""
+<h1 style='text-align: center; color: #2E86C1;'>📊 Attendance Management Dashboard</h1>
+<hr>
+""", unsafe_allow_html=True)
+
+st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
 
 # ============================================================
 # ✅ STEP 1: INITIAL LOAD (RUNS FIRST TIME)
@@ -730,55 +770,154 @@ if not df.empty:
 # ✅ Fix column type issues
 if "Working Hours" in df.columns:
     df["Working Hours"] = df["Working Hours"].astype(str)
-    st.dataframe(
-        df,
-        use_container_width=True
-    )
+    monthly_df = df[df["Month"] == selected_month]
+    st.dataframe(monthly_df, use_container_width=True)
 
 else:
 
     st.info("No attendance records found")
 
 # ============================================================
-# ✅ MONTHLY REPORT
+# ✅ MONTHLY ATTENDANCE REPORT (COMPLETE)
 # ============================================================
+
 st.subheader("📅 Monthly Attendance Report")
 
-monthly_df = load_attendance()
+# ✅ Load data
+df = load_attendance()
+df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
+# ✅ Create Month column
+df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
+# ✅ FILTER PANEL UI (STEP 3B)
+st.markdown("### 🔍 Filters")
 
-if not monthly_df.empty:
-
-    monthly_df["Month"] = monthly_df["Date"].astype(str).str[:7]
-
-    month_list = sorted(
-        monthly_df["Month"].dropna().unique(),
-        reverse=True
-    )
-
+col1, col2 = st.columns(2)
+with col1:
     selected_month = st.selectbox(
-        "Select Month",
-        month_list
+        "📅 Select Month",
+        sorted(df["Month"].dropna().unique(), reverse=True),
+        key="month_filter"
     )
 
-    report_df = monthly_df[
-        monthly_df["Month"] == selected_month
+with col2:
+    search = st.text_input("👤 Search Employee")
+    filtered_df = df[df["Month"] == selected_month]
+
+if search:
+    filtered_df = filtered_df[
+        filtered_df["Employee"].str.contains(search, case=False, na=False)
     ]
-
-    st.dataframe(
-        report_df,
-        use_container_width=True
-    )
-
-    st.download_button(
-        label="📥 Download Monthly Report",
-        data=report_df.to_csv(index=False).encode("utf-8"),
-        file_name=f"attendance_{selected_month}.csv",
-        mime="text/csv"
-    )
+    # ✅ Check overall data
+if df.empty:
+    st.info("⚠ No attendance data found")
 
 else:
 
-    st.info("No data available")
+    # ✅ Filter month
+    monthly_df = df[df["Month"] == selected_month]
+
+    # ✅ Apply search filter
+    if search:
+        monthly_df = monthly_df[
+            monthly_df["Employee"].str.contains(search, case=False, na=False)
+        ]
+
+    # ✅ FINAL CHECK BLOCK (ADD HERE ✅)
+    if not monthly_df.empty:
+        
+        st.markdown("### 📅 Attendance Details")
+
+        st.dataframe(monthly_df, use_container_width=True)
+
+        st.download_button(
+            label="⬇ Download Monthly Report",
+            data=monthly_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"attendance_{selected_month}.csv",
+            mime="text/csv"
+        )
+
+    else:
+        st.info("⚠ No data available for selected month")
+    
+    st.divider()
+    # ============================================================
+# ✅ DASHBOARD SUMMARY (STEP 4)
+# ============================================================
+
+st.markdown("### 📊 Summary")
+
+total_records = len(filtered_df)
+full_days = len(filtered_df[filtered_df["Status"] == "Full Day"])
+half_days = len(filtered_df[filtered_df["Status"] == "Half Day"])
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("📋 Total Records", total_records)
+
+with col2:
+    st.metric("✅ Full Days", full_days)
+
+with col3:
+    st.metric("⏱ Half Days", half_days)
+
+st.divider()
+
+# ✅ Check if data exists
+if not df.empty:
+
+    # ✅ Create Month column (VERY IMPORTANT)
+    df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
+
+    # ✅ Create sorted month list
+    month_list = sorted(df["Month"].dropna().unique(), reverse=True)
+
+    
+    # ✅ Filter data for selected month
+    monthly_df = df[df["Month"] == selected_month]
+
+    # ✅ Show title
+    st.write("📊 Monthly Data")
+
+    # ✅ Check if filtered data exists
+    if not monthly_df.empty:
+
+        # ✅ Show entries dropdown
+        entries = st.selectbox(
+            "Show entries",
+            [10, 25, 50, 100],
+            index=0,
+            key="entries_monthly"
+        )
+
+        # ✅ Limit rows
+        display_df = monthly_df.head(entries)
+
+
+# ✅ Apply search filter
+    if search:
+        monthly_df = monthly_df[
+            monthly_df["Employee"].str.contains(search, case=False, na=False)
+        ]
+
+# ✅ Check if filtered data exists
+    if not monthly_df.empty:
+        st.markdown("### 📅 Attendance Details")
+        st.dataframe(monthly_df, use_container_width=True)
+
+# ✅ ADD HERE (optional)
+st.divider()
+        # ✅ Download button
+if not monthly_df.empty:
+        st.download_button(
+            label="⬇ Download Monthly Report",
+            data=monthly_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"attendance_{selected_month}.csv",
+            mime="text/csv"
+        )
+
+else:
+        st.info("⚠ No data available for selected month")
 
 # ============================================================
 # ✅ FULL DOWNLOAD
