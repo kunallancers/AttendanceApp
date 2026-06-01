@@ -276,35 +276,24 @@ st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_
 
 ADMIN_USERS = ["ADMIN"]
 
-login_user = st.text_input("Enter Your ID (ADMIN/User)")
-
+# ✅ Load data
 df = load_attendance()
 
+# ✅ Get employee list
 employee_list = []
 if not df.empty and "Employee" in df.columns:
     employee_list = sorted(df["Employee"].dropna().unique())
 
-# ✅ IMPORTANT: show dropdown BEFORE clicking login (better UX)
-selected_employee = None
-if login_user.upper() in ADMIN_USERS:
-    selected_employee = st.selectbox(
-        "Select Employee",
-        employee_list,
-        key="admin_employee_select"
-    )
+# ✅ Employee dropdown login ✅
+selected_employee = st.selectbox(
+    "Select Employee",
+    employee_list,
+    key="employee_login"
+)
 
 # ✅ Login button
 if st.button("Login"):
-
-    if login_user.upper() in ADMIN_USERS:
-        st.session_state["employee"] = login_user
-        st.session_state["selected_employee"] = selected_employee
-
-    else:
-        if login_user:
-            st.session_state["employee"] = login_user
-            st.session_state["selected_employee"] = login_user
-
+    st.session_state["employee"] = selected_employee
 
 # ✅ Stop if not logged in
 if "employee" not in st.session_state:
@@ -312,18 +301,16 @@ if "employee" not in st.session_state:
     st.stop()
 
 employee = st.session_state["employee"]
-selected_employee = st.session_state["selected_employee"]
 
-# ✅ Nice layout for login status + logout
-col1, col2 = st.columns([6,1])
+# ✅ Show logged in user
+col1, col2 = st.columns([6, 1])
 
 with col1:
     st.success(f"✅ Logged in as: {employee}")
 
 with col2:
     if st.button("Logout"):
-        del st.session_state["employee"]
-        del st.session_state["selected_employee"]
+        st.session_state.clear()
         st.rerun()
 # ============================================================
 # ✅ GEOLOCATION SECTION
