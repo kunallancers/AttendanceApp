@@ -439,7 +439,6 @@ with col1:
     ]
 
 st.write("STEP 4 - About to write row")
-st.write(new_row)
 
 try:
 
