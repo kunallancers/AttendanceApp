@@ -496,13 +496,27 @@ with col2:
             # ✅ Calculate working hours
             try:
                 login_dt = pd.to_datetime(login_value)
+                now_dt = get_ist()
+                
+                
+                time_diff = now_dt - login_dt
+                
+                
+                total_seconds = int(time_diff.total_seconds())
+
+
                 hours = (now_dt - login_dt).total_seconds() / 3600
                 hours = round(hours, 2)
+                minutes = (total_seconds % 3600) // 60
+
+                working_hours = f"{hours:02d}:{minutes:02d}"   # ✅ HH:MM format
             except:
                 hours = 0
 
             # ✅ Save working hours
-            sheet.update_cell(row_number, 5, str(hours))
+            
+            sheet.update_cell(row_number, 5, working_hours)
+
 
             # ✅ Update status
             if hours >= 8:
