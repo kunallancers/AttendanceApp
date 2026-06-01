@@ -271,36 +271,60 @@ st.markdown("""
 
 st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
 # ============================================================
-# ✅ LOGIN SECTION
+# ✅ LOGIN SECTION (ADMIN + USER)
 # ============================================================
 
-# ✅ HEADER (Step 1)
+ADMIN_USERS = ["ADMIN"]
 
-st.markdown("""
-<h1 style='text-align: center; color: #2E86C1;'>📊 Attendance Management Dashboard</h1>
-<hr>
-""", unsafe_allow_html=True)
+login_user = st.text_input("Enter Your ID (ADMIN/User)")
 
+df = load_attendance()
 
-# ============================================================
-# ✅ LOGIN SECTION
-# ============================================================
+employee_list = []
+if not df.empty and "Employee" in df.columns:
+    employee_list = sorted(df["Employee"].dropna().unique())
 
-employee_input = st.text_input("Employee ID")
+# ✅ IMPORTANT: show dropdown BEFORE clicking login (better UX)
+selected_employee = None
+if login_user.upper() in ADMIN_USERS:
+    selected_employee = st.selectbox(
+        "Select Employee",
+        employee_list,
+        key="admin_employee_select"
+    )
 
+# ✅ Login button
 if st.button("Login"):
-    if employee_input:
-        st.session_state["employee"] = employee_input
 
+    if login_user.upper() in ADMIN_USERS:
+        st.session_state["employee"] = login_user
+        st.session_state["selected_employee"] = selected_employee
+
+    else:
+        if login_user:
+            st.session_state["employee"] = login_user
+            st.session_state["selected_employee"] = login_user
+
+
+# ✅ Stop if not logged in
 if "employee" not in st.session_state:
     st.warning("⚠ Please login to continue")
     st.stop()
 
 employee = st.session_state["employee"]
+selected_employee = st.session_state["selected_employee"]
 
-st.success(f"✅ Logged in as: {employee}")
+# ✅ Nice layout for login status + logout
+col1, col2 = st.columns([6,1])
 
+with col1:
+    st.success(f"✅ Logged in as: {employee}")
 
+with col2:
+    if st.button("Logout"):
+        del st.session_state["employee"]
+        del st.session_state["selected_employee"]
+        st.rerun()
 # ============================================================
 # ✅ GEOLOCATION SECTION
 # ============================================================
