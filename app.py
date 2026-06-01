@@ -55,10 +55,6 @@ current_time = time.time()
 if current_time - st.session_state["last_refresh"] > 5:
     st.session_state["last_refresh"] = current_time
     st.rerun()
-# ✅ Initialize session for location
-if "location" not in st.session_state:
-    st.session_state["location"] = None
-
 
 # ✅ Function to fetch location
 def get_location():
@@ -270,37 +266,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
-# ============================================================
-# ✅ LOGIN SECTION (ADMIN + USER)
-# ============================================================
-
-ADMIN_USERS = ["ADMIN"]
-
-# ✅ Load data
-df = load_attendance()
-
-# ✅ Get employee list
-employee_list = []
-if not df.empty and "Employee" in df.columns:
-    employee_list = sorted(df["Employee"].dropna().unique())
-
-# ✅ Employee dropdown login ✅
-selected_employee = st.selectbox(
-    "Select Employee",
-    employee_list,
-    key="employee_login"
-)
-
-# ✅ Login button
-if st.button("Login"):
-    st.session_state["employee"] = selected_employee
-
-# ✅ Stop if not logged in
-if "employee" not in st.session_state:
-    st.warning("⚠ Please login to continue")
-    st.stop()
-
-employee = st.session_state["employee"]
 
 # ✅ Show logged in user
 col1, col2 = st.columns([6, 1])
@@ -308,98 +273,32 @@ col1, col2 = st.columns([6, 1])
 with col1:
     st.success(f"✅ Logged in as: {employee}")
 
-with col2:
-    if st.button("Logout"):
-        st.session_state.clear()
-        st.rerun()
 # ============================================================
-# ✅ GEOLOCATION SECTION
+# ✅ LOCATION INITIALIZATION + FETCH
 # ============================================================
 
-location = streamlit_geolocation()
-
-if location:
-    st.success("📍 Location captured successfully ✅")
-    st.write(f"Latitude: {location['latitude']}")
-    st.write(f"Longitude: {location['longitude']}")
-
-# ============================================================
-# ✅ MONTHLY REPORT
-# ============================================================
-
-st.subheader("📅 Monthly Attendance Report")
-
-# ✅ Load data
-df = load_attendance()
-
-if df.empty:
-    st.info("⚠ No attendance data found")
-    st.stop()
-
-# ✅ Ensure Date exists
-if "Date" not in df.columns:
-    st.error("❌ Date column missing")
-    st.stop()
-
-# ✅ Create Month column
-df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
-
-# ✅ Filters
-col1, col2 = st.columns(2)
-
-with col1:
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        sorted(df["Month"].dropna().unique(), reverse=True),
-        key="month_filter"
-    )
-
-with col2:
-    search = st.text_input("👤 Search Employee")
-
-# ✅ Filter data
-monthly_df = df[df["Month"] == selected_month]
-
-if search:
-    monthly_df = monthly_df[
-        monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
-    ]
-
-# ✅ Display
-if not monthly_df.empty:
-    st.dataframe(monthly_df, use_container_width=True)
-else:
-    st.info("⚠ No data available for selected month")
-# ============================================================
-# ✅ STEP 1: INITIAL LOAD (RUNS FIRST TIME)
-# ============================================================
 if "location" not in st.session_state:
-    location = streamlit_geolocation()
+    st.session_state["location"] = {}
 
-    if location and location.get("latitude") and location.get("longitude"):
-        lat = str(location["latitude"])
-        lon = str(location["longitude"])
-        st.session_state["location"] = f"{lat},{lon}"
-
-# ============================================================
-# ✅ STEP 2: MAIN LOCATION FETCH (ALWAYS RUNS)
-# ============================================================
 location = streamlit_geolocation()
 
 if location and location.get("latitude") and location.get("longitude"):
-    lat = str(location["latitude"])
-    lon = str(location["longitude"])
+    st.session_state["location"] = {
+        "lat": location["latitude"],
+        "lon": location["longitude"]
+    }
 
-    # ✅ Update latest location
-    st.session_state["location"] = f"{lat},{lon}"
+# Get location values safely
+loc = st.session_state.get("location", {})
 
-else:
-    loc = st.session_state.get("location", "NA,NA")
-    try:
-        lat, lon = loc.split(",")
-    except:
-        lat, lon = "NA", "NA"
+lat = str(loc.get("lat", "NA"))
+lon = str(loc.get("lon", "NA"))
 
+# ✅ Read stored location
+loc = st.session_state.get("location", {})
+
+lat = str(loc.get("lat", "NA"))
+lon = str(loc.get("lon", "NA"))
 # ============================================================
 # ✅ STEP 3: DISPLAY LOCATION
 # ============================================================
@@ -475,21 +374,21 @@ with col1:
 
     if st.button("🟢 Login Attendance"):
 
-        # ✅ Fresh location (UNIQUE KEY)
-        location = streamlit_geolocation()
+        st.write("STEP 1 - Button Clicked")
 
-        if location and location.get("latitude") and location.get("longitude"):
-            lat = str(location["latitude"])
-            lon = str(location["longitude"])
-        else:
-            loc = st.session_state.get("location", "NA,NA")
-            try:
-                lat, lon = loc.split(",")
-            except:
-                lat, lon = "NA", "NA"
+        # ✅ Fresh location (UNIQUE KEY)
+        loc = st.session_state.get("location", {})
+
+        lat = str(loc.get("lat", "NA"))
+        lon = str(loc.get("lon", "NA"))
 
         sheet, _ = connect_sheet()
         df = load_attendance()
+        
+        st.write("STEP 2 - Sheet Connected")
+        st.write(f"Employee: {employee}")
+        st.write(f"Date: {date_str}")
+        st.write(f"Location: {lat}, {lon}")
 
         now = get_ist().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -498,6 +397,9 @@ with col1:
             (df["Employee"] == employee)
         )
 
+        st.write("STEP 3 - Checking existing attendance")
+        st.write(f"Records Found: {len(df)}")
+        st.write(f"Match Found: {mask.any()}")
         if not df.empty and mask.any():
 
             idx = df[mask].index[0]
@@ -530,13 +432,27 @@ with col1:
                 "",
                 "In Progress",
                 attendance_type,
-                lat,
-                lon
-            ]
+                 lat,
+        lon,
+        "",  # Logout Latitude
+        ""   # Logout Longitude
+    ]
 
-            sheet.append_row(new_row)
+st.write("STEP 4 - About to write row")
+st.write(new_row)
 
-        st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
+try:
+
+    sheet.append_row(new_row)
+
+
+    st.success("STEP 4 - Row Added Successfully")
+
+except Exception as e:
+
+    st.error(f"STEP 4 ERROR: {e}")
+
+st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
 
 # ============================================================
 # ✅ LOGOUT ATTENDANCE
@@ -545,18 +461,11 @@ with col2:
 
     if st.button("🔴 Logout Attendance"):
 
-        # ✅ Capture fresh location (same as login)
-        location = streamlit_geolocation(key="Logout_location")
+        # ✅ Get stored location
+        loc = st.session_state.get("location", {})
 
-        if location and location.get("latitude") and location.get("longitude"):
-            lat = str(location["latitude"])
-            lon = str(location["longitude"])
-        else:
-            loc = st.session_state.get("location", "NA,NA")
-            try:
-                lat, lon = loc.split(",")
-            except:
-                lat, lon = "NA", "NA"
+        lat = str(loc.get("lat", "NA"))
+        lon = str(loc.get("lon", "NA"))
 
         sheet, _ = connect_sheet()
         df = load_attendance()
@@ -614,6 +523,80 @@ with col2:
 
         else:
             st.warning("⚠ No login record found")
+
+# ============================================================
+# ✅ TODAY'S ATTENDANCE STATUS
+# ============================================================
+
+st.subheader("📋 Today's Attendance")
+
+df_today = load_attendance()
+
+today_str = date.today().strftime("%Y-%m-%d")
+
+if not df_today.empty:
+
+    # Admin sees all today's records
+    if role == "admin":
+        today_data = df_today[df_today["Date"] == today_str]
+
+    # Employee sees only own record
+    else:
+        today_data = df_today[
+            (df_today["Date"] == today_str) &
+            (df_today["Employee"] == employee)
+        ]
+
+    if not today_data.empty:
+
+        latest = today_data.iloc[-1]
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+
+        with col1:
+            st.metric("🟢 Login", latest["Login"])
+
+        with col2:
+            st.metric(
+                "🔴 Logout",
+                latest["Logout"] if str(latest["Logout"]).strip() else "Pending"
+            )
+
+        with col3:
+            st.metric("⏱ Hours", latest["Working Hours"])
+
+        with col4:
+            st.metric("📌 Status", latest["Status"])
+
+        with col5:
+            st.metric("🏠 Type", latest["Type"])
+
+        st.markdown("### 📄 Detailed Attendance")
+
+        st.dataframe(
+            today_data[
+                [
+                    "Date",
+                    "Employee",
+                    "Login",
+                    "Logout",
+                    "Working Hours",
+                    "Status",
+                    "Type",
+                    "Login Latitude",
+                    "Login Longitude",
+                    "Logout Latitude",
+                    "Logout Longitude"
+                ]
+            ],
+            use_container_width=True
+        )
+
+    else:
+        st.info("No attendance recorded today.")
+
+else:
+    st.info("Attendance sheet is empty.")
 
 # ============================================================
 # ✅ CLEAR ATTENDANCE
@@ -882,7 +865,13 @@ st.markdown("### 🔍 Filters")
 
 col1, col2 = st.columns(2)
 
-
+# Create Month column if missing
+if "Month" not in df.columns:
+    df["Month"] = pd.to_datetime(
+        df["Date"],
+        errors="coerce"
+    ).dt.strftime("%Y-%m")
+    
 with col1:
     selected_month = st.selectbox(
         "📅 Select Month",
@@ -906,35 +895,7 @@ if search:
     ]
 
 
-# ============================================================
-# ✅ DISPLAY DATA
-# ============================================================
-
-if not monthly_df.empty:
-
-    st.markdown("### 📅 Attendance Details")
-
-    # ✅ Show limited rows
-    entries = st.selectbox(
-        "Show entries",
-        [10, 25, 50, 100],
-        index=0,
-        key="entries_month"
-    )
-
-    display_df = monthly_df.head(entries)
-
-    st.dataframe(display_df, use_container_width=True)
-
     st.divider()
-
-    # ✅ Download button
-    st.download_button(
-        label="⬇ Download Monthly Report",
-        data=monthly_df.to_csv(index=False).encode("utf-8"),
-        file_name=f"attendance_{selected_month}.csv",
-        mime="text/csv"
-    )
 
 else:
     st.info("⚠ No data available for selected month")
@@ -946,8 +907,7 @@ else:
 
 st.subheader("📅 Monthly Attendance Report")
 
-# ✅ Load data
-df = load_attendance()
+monthly_df = df.copy()
 
 # ✅ Check if data exists
 if df.empty:
@@ -961,26 +921,6 @@ if "Date" not in df.columns:
 
 # ✅ Create Month column (ONLY ONCE ✅)
 df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
-
-
-# ============================================================
-# ✅ FILTER PANEL
-# ============================================================
-
-st.markdown("### 🔍 Filters")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        sorted(df["Month"].dropna().unique(), reverse=True),
-        key="month_filter"
-    )
-
-with col2:
-    search = st.text_input("👤 Search Employee")
-
 
 # ============================================================
 # ✅ FILTER DATA
@@ -1048,7 +988,8 @@ if not monthly_df.empty:
         label="⬇ Download Monthly Report",
         data=monthly_df.to_csv(index=False).encode("utf-8"),
         file_name=f"attendance_{selected_month}.csv",
-        mime="text/csv"
+        mime="text/csv",
+        key="download_monthly_report"
     )
 
 else:
@@ -1065,5 +1006,6 @@ st.download_button(
     label="📥 Download Full Attendance",
     data=df.to_csv(index=False).encode("utf-8"),
     file_name="attendance_full.csv",
-    mime="text/csv"
+    mime="text/csv",
+    key="download_full_attendance"
 )
