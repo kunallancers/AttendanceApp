@@ -380,6 +380,7 @@ if login_click:
         t2 = datetime.strptime(current_time, "%H:%M:%S")
 
         working_hours = str(t2 - t1)
+        hours = float(working_hours.split(":")[0])
 
         # Update record logic (depends on your sheet)
         update_logout_time(employee, current_date, current_time, working_hours)
@@ -389,7 +390,7 @@ if login_click:
     else:
         st.warning("⚠ Please Punch In first")
         if not today_record.empty:
-    hours = float(working_hours.split(":")[0])
+            hours = float(working_hours.split(":")[0])
 
     if hours >= 8:
         status = "Full Day"
