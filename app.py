@@ -323,7 +323,80 @@ if location:
     st.write(f"Latitude: {location['latitude']}")
     st.write(f"Longitude: {location['longitude']}")
 
+# ============================================================
+# ✅ ATTENDANCE PUNCH SECTION
+# ============================================================
 
+st.markdown("### ⏱ Attendance")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    login_click = st.button("✅ Punch In")
+
+with col2:
+    logout_click = st.button("🔴 Punch Out")
+from datetime import datetime
+
+now = datetime.now()
+current_time = now.strftime("%H:%M:%S")
+current_date = now.strftime("%Y-%m-%d")
+
+lat = location["latitude"] if location else None
+lon = location["longitude"] if location else None
+
+if login_click:
+    new_data = {
+        "Employee": employee,
+        "Date": current_date,
+        "Login Time": current_time,
+        "Logout Time": "",
+        "Latitude": lat,
+        "Longitude": lon,
+        "Working Hours": "",
+        "Status": "In Progress"
+    }
+
+    append_to_google_sheet(new_data)
+
+    st.success("✅ Punch In recorded!")
+    
+    if logout_click:
+        df = load_attendance()
+
+    # Get today's record
+    today_record = df[
+        (df["Employee"] == employee) &
+        (df["Date"] == current_date)
+    ]
+
+    if not today_record.empty:
+
+        login_time = today_record.iloc[-1]["Login Time"]
+
+        from datetime import datetime
+
+        t1 = datetime.strptime(login_time, "%H:%M:%S")
+        t2 = datetime.strptime(current_time, "%H:%M:%S")
+
+        working_hours = str(t2 - t1)
+
+        # Update record logic (depends on your sheet)
+        update_logout_time(employee, current_date, current_time, working_hours)
+
+        st.success("✅ Punch Out recorded!")
+
+    else:
+        st.warning("⚠ Please Punch In first")
+        if not today_record.empty:
+    hours = float(working_hours.split(":")[0])
+
+    if hours >= 8:
+        status = "Full Day"
+    elif hours >= 4:
+        status = "Half Day"
+    else:
+        status = "Absent"
 # ============================================================
 # ✅ MONTHLY REPORT
 # ============================================================
