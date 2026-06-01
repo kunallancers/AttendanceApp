@@ -432,11 +432,11 @@ with col1:
                 "",
                 "In Progress",
                 attendance_type,
-                 lat,
-        lon,
-        "",  # Logout Latitude
-        ""   # Logout Longitude
-    ]
+                lat,
+                lon,
+                "",
+                ""
+        ]
 
 st.write("STEP 4 - About to write row")
 
@@ -459,7 +459,7 @@ st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
 with col2:
 
     if st.button("🔴 Logout Attendance"):
-
+        sheet, _ = connect_sheet()
         # ✅ Get stored location
         loc = st.session_state.get("location", {})
 
@@ -507,7 +507,7 @@ with col2:
             # ✅ Update status
             if hours >= 8:
                 status = "Full Day"
-            elif hours >= 4:
+            elif hours >= 6:
                 status = "Half Day"
             else:
                 status = "Absent"
