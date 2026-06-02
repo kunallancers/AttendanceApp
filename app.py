@@ -525,18 +525,22 @@ with col2:
             st.warning("⚠ No login record found")
 
 # ============================================================
-# ✅ TODAY'S ATTENDANCE STATUS (FINAL VERSION)
+# ✅ TODAY'S ATTENDANCE STATUS (FINAL ALIGNED VERSION)
 # ============================================================
 
 st.subheader("📋 Today's Attendance")
 
 df_today = load_attendance()
-
 today_str = date.today().strftime("%Y-%m-%d")
 
-if not df_today.empty:
+# ✅ Check if sheet is empty
+if df_today.empty:
+    st.info("Attendance sheet is empty.")
 
-    # ✅ Admin vs Employee filter
+else:
+    # ========================================================
+    # ✅ FILTER DATA (ADMIN vs EMPLOYEE)
+    # ========================================================
     if role == "admin":
         today_data = df_today[df_today["Date"] == today_str]
     else:
@@ -545,91 +549,52 @@ if not df_today.empty:
             (df_today["Employee"] == employee)
         ]
 
+    # ========================================================
+    # ✅ DISPLAY TODAY DATA
+    # ========================================================
     if not today_data.empty:
 
-        # SHOW ALL EMPLOYEES TODAY
-        latest_data = today_data.sort_values(by="Login")
+        # ✅ Convert datetime safely
+        try:
+            today_data["Login"] = pd.to_datetime(
+                today_data["Login"], errors="coerce"
+            )
+            today_data["Logout"] = pd.to_datetime(
+                today_data["Logout"], errors="coerce"
+            )
+        except:
+            pass
 
+        # ✅ Sort by login time
+        try:
+            today_data = today_data.sort_values(by="Login")
+        except:
+            pass
+
+        # ✅ Format time to HH:MM
+        try:
+            today_data["Login"] = today_data["Login"].dt.strftime("%H:%M")
+            today_data["Logout"] = today_data["Logout"].dt.strftime("%H:%M")
+        except:
+            pass
+
+        # ✅ Show clean table
         st.dataframe(
-            latest_data[
-                ["Employee", "Login", "Logout", "Working Hours", "Status", "Type"]
+            today_data[
+                [
+                    "Employee",
+                    "Login",
+                    "Logout",
+                    "Working Hours",
+                    "Status",
+                    "Type"
+                ]
             ],
             use_container_width=True
         )
 
-        # ✅ Safe extraction
-        login_val = latest.get("Login", "")
-        logout_val = latest.get("Logout", "")
-        hours_val = latest.get("Working Hours", "00:00")
-        status_val = latest.get("Status", "In Progress")
-        type_val = latest.get("Type", "-")
-
-        # ✅ Format login time → HH:MM
-        try:
-            login_val = pd.to_datetime(login_val).strftime("%H:%M")
-        except:
-            login_val = "-"
-
-        # ✅ Format logout time
-        try:
-            logout_val = pd.to_datetime(logout_val).strftime("%H:%M")
-        except:
-            logout_val = "Pending"
-
-        # ✅ Clean dashboard layout
-        col1, col2, col3, col4, col5 = st.columns(5)
-
-        with col1:
-            st.markdown("**🟢 Login**")
-            st.markdown(f"<p style='font-size:17px; margin:0;'>{login_val}</p>", unsafe_allow_html=True)
-
-        with col2:
-            st.markdown("**🔴 Logout**")
-            st.markdown(f"<p style='font-size:17px; margin:0;'>{logout_val}</p>", unsafe_allow_html=True)
-
-        with col3:
-            st.markdown("**⏱ Hours**")
-            st.markdown(f"<p style='font-size:17px; margin:0;'>{hours_val}</p>", unsafe_allow_html=True)
-
-        with col4:
-            st.markdown("**📌 Status**")
-            st.markdown(f"<p style='font-size:17px; margin:0;'>{status_val}</p>", unsafe_allow_html=True)
-
-        with col5:
-            st.markdown("**🏠 Type**")
-            st.markdown(f"<p style='font-size:17px; margin:0;'>{type_val}</p>", unsafe_allow_html=True)
-
-        st.divider()
-
-        st.markdown("### 📄 Detailed Attendance")
-
-# ✅ Load full data instead of today_data
-df_full = load_attendance()
-
-if not df_full.empty:
-    df_full = df_full.sort_values(by=["Date", "Login"], ascending=[False, False])
-
-    st.dataframe(
-        df_full[
-            [
-                "Date",
-                "Employee",
-                "Login",
-                "Logout",
-                "Working Hours",
-                "Status",
-                "Type",
-                "Login Latitude",
-                "Login Longitude",
-                "Logout Latitude",
-                "Logout Longitude"
-            ]
-        ],
-        use_container_width=True
-    )
-
-else:
-    st.info("No attendance records found.")
+    else:
+        st.info("No attendance recorded today.")
 
 # ============================================================
 # ✅ CLEAR ATTENDANCE (FINAL CLEAN VERSION)
