@@ -400,79 +400,79 @@ with col1:
         st.write("STEP 3 - Checking existing attendance")
         st.write(f"Records Found: {len(df)}")
         st.write(f"Match Found: {mask.any()}")
-        if not df.empty and mask.any():
+       # ============================================================
+# ✅ LOGIN ATTENDANCE (FINAL COMPLETE VERSION)
+# ============================================================
 
-            idx = df[mask].index[0]
+with col1:
 
-            existing_login = df.at[idx, "Login"]
+    if st.button("🟢 Login Attendance", key="login_att_btn"):
 
-            if pd.notna(existing_login) and str(existing_login).strip() != "":
-                st.warning("⚠ Already Logged In")
-                st.stop()
+        st.write("STEP 1 - Button Clicked")
 
-            row_number = idx + 2
+        # ✅ Get stored location
+        loc = st.session_state.get("location", {})
+        lat = str(loc.get("lat", "NA"))
+        lon = str(loc.get("lon", "NA"))
 
-            # ✅ Update login time
-            sheet.update_cell(row_number, 3, now)
+        # ✅ Connect to sheet
+        sheet, _ = connect_sheet()
 
-            # ✅ Save login location
-            sheet.update_cell(row_number, 8, lat)
-            sheet.update_cell(row_number, 9, lon)
+        # ✅ Load data
+        df = load_attendance()
 
-            # ✅ Update status
-            sheet.update_cell(row_number, 6, "In Progress")
+        st.write("STEP 2 - Sheet Connected")
+        st.write(f"Employee: {employee}")
+        st.write(f"Date: {date_str}")
+        st.write(f"Location: {lat}, {lon}")
 
-        else:
+        # ✅ Current time
+        now_dt = get_ist()
+        now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
-            new_row = [
-                date_str,
-                employee,
-                now,
-                "",
-                "",
-                "In Progress",
-                attendance_type,
-                lat,
-                lon,
-                "",
-                ""
+        # ====================================================
+        # ✅ STEP 3 — CHECK DUPLICATE LOGIN
+        # ====================================================
+
+        existing_today = df[
+            (df["Date"] == date_str) &
+            (df["Employee"] == employee)
         ]
 
-st.write("STEP 4 - About to write row")
+        if not existing_today.empty:
+            st.warning("⚠ Already logged in for today")
+            st.stop()
 
-try:
-    # ✅ CONNECT SHEET
-    sheet, _ = connect_sheet()
+        st.write("STEP 3 - No existing entry, proceeding")
 
-    # ✅ CURRENT TIME
-    now = get_ist()
-    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        # ====================================================
+        # ✅ STEP 4 — CREATE NEW ROW
+        # ====================================================
 
-    # ✅ SAFE LOCATION
-    lat = str(lat) if lat else "NA"
-    lon = str(lon) if lon else "NA"
+        new_row = [
+            date_str,
+            employee,
+            now_str,     # Login
+            "",          # Logout
+            "",          # Working Hours
+            "In Progress",
+            attendance_type,
+            lat,
+            lon,
+            "",          # Logout lat
+            ""           # Logout lon
+        ]
 
-    # ✅ DEFINE ROW ✅ (IMPORTANT)
-    new_row = [
-        date_str,
-        employee,
-        now_str,     # Login time
-        "",          # Logout
-        "",          # Working Hours
-        "In Progress",
-        attendance_type,
-        lat,
-        lon
-    ]
+        st.write("STEP 4 - About to write row")
 
-    # ✅ WRITE TO SHEET
-    sheet.append_row(new_row)
+        try:
+            # ✅ Save to Google Sheet
+            sheet.append_row(new_row)
 
-    st.success("✅ Login Recorded")
-    st.write(f"📍 Location: {lat}, {lon}")
+            st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
 
-except Exception as e:
-    st.error(f"STEP 4 ERROR: {e}")
+        except Exception as e:
+            st.error(f"STEP 4 ERROR: {e}")
 
 st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
 
