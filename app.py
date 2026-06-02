@@ -629,6 +629,40 @@ if role == "admin":
             st.rerun()
 
 # ============================================================
+# ✅ REMOVE DUPLICATE ENTRIES (RUN ONCE)
+# ============================================================
+
+if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
+
+    sheet, _ = connect_sheet()
+    df = load_attendance()
+
+    if df.empty:
+        st.warning("No data found in sheet")
+        st.stop()
+
+    # ✅ Remove duplicates (keep latest entry)
+    df_clean = df.drop_duplicates(
+        subset=["Employee", "Date"],
+        keep="last"
+    )
+
+    # ✅ Sort clean data (optional)
+    df_clean = df_clean.sort_values(by=["Date", "Employee"])
+
+    # ✅ Clear sheet
+    sheet.clear()
+
+    # ✅ Add header again
+    sheet.append_row(list(df_clean.columns))
+
+    # ✅ Add cleaned data
+    for _, row in df_clean.iterrows():
+        sheet.append_row(row.tolist())
+
+    st.success("✅ Duplicate entries removed successfully")
+
+# ============================================================
 # ✅ LEAVE MANAGEMENT
 # ============================================================
 st.subheader("📩 Leave Management")
