@@ -628,10 +628,6 @@ if role == "admin":
 
             st.rerun()
 
-# ============================================================
-# ✅ REMOVE DUPLICATE ENTRIES (RUN ONCE)
-# ============================================================
-
 if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
 
     sheet, _ = connect_sheet()
@@ -641,27 +637,41 @@ if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
         st.warning("No data found in sheet")
         st.stop()
 
-    # ✅ Remove duplicates (keep latest entry)
+    # ✅ Ensure Date is clean (STRING)
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
+
+    # ✅ Ensure Login is datetime for sorting
+    df["Login"] = pd.to_datetime(df["Login"], errors="coerce")
+
+    # ✅ Sort so latest login appears last
+    df = df.sort_values(by=["Employee", "Date", "Login"])
+
+    # ✅ Remove duplicates → keep latest login
     df_clean = df.drop_duplicates(
         subset=["Employee", "Date"],
         keep="last"
     )
 
-    # ✅ Sort clean data (optional)
+    # ✅ Sort final clean data
     df_clean = df_clean.sort_values(by=["Date", "Employee"])
 
-    # ✅ Clear sheet
+    # ✅ Convert Login back to string
+    df_clean["Login"] = df_clean["Login"].dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    # ✅ Clear and rewrite sheet
     sheet.clear()
 
-    # ✅ Add header again
-    sheet.append_row(list(df_clean.columns))
+    sheet.append_row([
+        "Date","Employee","Login","Logout",
+        "Working Hours","Status","Type",
+        "Login Latitude","Login Longitude",
+        "Logout Latitude","Logout Longitude"
+    ])
 
-    # ✅ Add cleaned data
     for _, row in df_clean.iterrows():
         sheet.append_row(row.tolist())
 
     st.success("✅ Duplicate entries removed successfully")
-
 # ============================================================
 # ✅ LEAVE MANAGEMENT
 # ============================================================
