@@ -586,23 +586,23 @@ if not df_today.empty:
 
         with col1:
             st.markdown("**🟢 Login**")
-            st.markdown(f"<h4>{login_val}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:18px; margin:0;'>{login_val}</p>", unsafe_allow_html=True)
 
         with col2:
             st.markdown("**🔴 Logout**")
-            st.markdown(f"<h4>{logout_val}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:18px; margin:0;'>{logout_val}</p>", unsafe_allow_html=True)
 
         with col3:
             st.markdown("**⏱ Hours**")
-            st.markdown(f"<h4>{hours_val}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:18px; margin:0;'>{hours_val}</p>", unsafe_allow_html=True)
 
         with col4:
             st.markdown("**📌 Status**")
-            st.markdown(f"<h4>{status_val}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:18px; margin:0;'>{status_val}</p>", unsafe_allow_html=True)
 
         with col5:
             st.markdown("**🏠 Type**")
-            st.markdown(f"<h4>{type_val}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:18px; margin:0;'>{type_val}</p>", unsafe_allow_html=True)
 
         st.divider()
 
@@ -637,20 +637,34 @@ else:
     st.info("Attendance sheet is empty.")
 
 # ============================================================
-# ✅ CLEAR ATTENDANCE
+# ✅ CLEAR ATTENDANCE (FINAL CLEAN VERSION)
 # ============================================================
-with col3:
 
-    if role == "admin":
+st.divider()
 
-        confirm = st.checkbox("Confirm Clear Attendance")
+# ✅ ADMIN ONLY
+if role == "admin":
 
-        if confirm and st.button("🧹 Clear Attendance"):
+    st.markdown("### ⚠️ Admin Controls")
+
+    confirm_clear = st.checkbox(
+        "Confirm Clear Attendance",
+        key="confirm_clear_attendance"
+    )
+
+    if confirm_clear:
+
+        if st.button(
+            "🧹 Clear Attendance",
+            key="clear_attendance_btn"
+        ):
 
             sheet, _ = connect_sheet()
 
+            # ✅ Clear all rows
             sheet.clear()
 
+            # ✅ Recreate header (IMPORTANT ✅)
             sheet.append_row([
                 "Date",
                 "Employee",
@@ -658,10 +672,16 @@ with col3:
                 "Logout",
                 "Working Hours",
                 "Status",
-                "Type"
+                "Type",
+                "Login Latitude",
+                "Login Longitude",
+                "Logout Latitude",
+                "Logout Longitude"
             ])
 
-            st.success("✅ Attendance Cleared")
+            st.success("✅ Attendance Cleared Successfully")
+
+            st.rerun()
 
 # ============================================================
 # ✅ LEAVE MANAGEMENT
