@@ -664,9 +664,11 @@ if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
         "Logout Latitude","Logout Longitude"
     ])
 
-    # ✅ Write cleaned data
-    for _, row in df_clean.iterrows():
-        sheet.append_row(row.tolist())
+    # ✅ Convert dataframe to list of lists
+    data_to_write = [df_clean.columns.tolist()] + df_clean.values.tolist()
+
+    # ✅ Write entire sheet at once (VERY IMPORTANT)
+    sheet.update("A1", data_to_write)
 
     st.success("✅ Duplicate entries removed successfully")
 # ============================================================
