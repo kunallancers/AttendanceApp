@@ -368,39 +368,28 @@ attendance_type = st.selectbox(
 col1, col2, col3 = st.columns(3)
 
 # ============================================================
-# ✅ LOGIN ATTENDANCE (FINAL COMPLETE VERSION)
+# ✅ LOGIN ATTENDANCE (FINAL DUPLICATE-PROOF VERSION)
 # ============================================================
 
 with col1:
 
     if st.button("🟢 Login Attendance", key="login_att_btn"):
 
-        st.write("STEP 1 - Button Clicked")
-
         # ✅ Get stored location
         loc = st.session_state.get("location", {})
         lat = str(loc.get("lat", "NA"))
         lon = str(loc.get("lon", "NA"))
 
-        # ✅ Connect to sheet
+        # ✅ Connect & load data
         sheet, _ = connect_sheet()
-
-        # ✅ Load data
         df = load_attendance()
 
-        st.write("STEP 2 - Sheet Connected")
-        st.write(f"Employee: {employee}")
-        st.write(f"Date: {date_str}")
-        st.write(f"Location: {lat}, {lon}")
-
-        # ✅ Current time
         now_dt = get_ist()
         now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
         # ====================================================
-        # ✅ STEP 3 — CHECK DUPLICATE LOGIN
+        # ✅ STEP 1 — CHECK EXISTING ENTRY
         # ====================================================
-
         existing_today = df[
             (df["Date"] == date_str) &
             (df["Employee"] == employee)
@@ -410,36 +399,32 @@ with col1:
             st.warning("⚠ Already logged in for today")
             st.stop()
 
-        st.write("STEP 3 - No existing entry, proceeding")
-
         # ====================================================
-        # ✅ STEP 4 — CREATE NEW ROW
+        # ✅ STEP 2 — CREATE NEW RECORD
         # ====================================================
-
         new_row = [
             date_str,
             employee,
-            now_str,     # Login
-            "",          # Logout
-            "",          # Working Hours
+            now_str,
+            "",
+            "",
             "In Progress",
             attendance_type,
             lat,
             lon,
-            "",          # Logout lat
-            ""           # Logout lon
+            "",
+            ""
         ]
 
-        st.write("STEP 4 - About to write row")
-
+        # ====================================================
+        # ✅ STEP 3 — SAVE DATA
+        # ====================================================
         try:
-            # ✅ Save to Google Sheet
             sheet.append_row(new_row)
-
             st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
 
         except Exception as e:
-            st.error(f"STEP 4 ERROR: {e}")
+            st.error(f"❌ Error saving data: {e}")
 # ============================================================
 # ✅ LOGOUT ATTENDANCE
 # ============================================================
