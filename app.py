@@ -441,14 +441,37 @@ with col1:
 st.write("STEP 4 - About to write row")
 
 try:
+    # ✅ CONNECT SHEET
+    sheet, _ = connect_sheet()
 
+    # ✅ CURRENT TIME
+    now = get_ist()
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    # ✅ SAFE LOCATION
+    lat = str(lat) if lat else "NA"
+    lon = str(lon) if lon else "NA"
+
+    # ✅ DEFINE ROW ✅ (IMPORTANT)
+    new_row = [
+        date_str,
+        employee,
+        now_str,     # Login time
+        "",          # Logout
+        "",          # Working Hours
+        "In Progress",
+        attendance_type,
+        lat,
+        lon
+    ]
+
+    # ✅ WRITE TO SHEET
     sheet.append_row(new_row)
 
-
-    st.success("STEP 4 - Row Added Successfully")
+    st.success("✅ Login Recorded")
+    st.write(f"📍 Location: {lat}, {lon}")
 
 except Exception as e:
-
     st.error(f"STEP 4 ERROR: {e}")
 
 st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
