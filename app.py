@@ -538,7 +538,7 @@ with col2:
             st.warning("⚠ No login record found")
 
 # ============================================================
-# ✅ TODAY'S ATTENDANCE STATUS
+# ✅ TODAY'S ATTENDANCE STATUS (FINAL VERSION)
 # ============================================================
 
 st.subheader("📋 Today's Attendance")
@@ -549,11 +549,9 @@ today_str = date.today().strftime("%Y-%m-%d")
 
 if not df_today.empty:
 
-    # Admin sees all today's records
+    # ✅ Admin vs Employee filter
     if role == "admin":
         today_data = df_today[df_today["Date"] == today_str]
-
-    # Employee sees only own record
     else:
         today_data = df_today[
             (df_today["Date"] == today_str) &
@@ -564,26 +562,53 @@ if not df_today.empty:
 
         latest = today_data.iloc[-1]
 
+        # ✅ Safe extraction
+        login_val = latest.get("Login", "")
+        logout_val = latest.get("Logout", "")
+        hours_val = latest.get("Working Hours", "00:00")
+        status_val = latest.get("Status", "In Progress")
+        type_val = latest.get("Type", "-")
+
+        # ✅ Format login time → HH:MM
+        try:
+            login_val = pd.to_datetime(login_val).strftime("%H:%M")
+        except:
+            login_val = "-"
+
+        # ✅ Format logout time
+        try:
+            logout_val = pd.to_datetime(logout_val).strftime("%H:%M")
+        except:
+            logout_val = "Pending"
+
+        # ✅ Clean dashboard layout
         col1, col2, col3, col4, col5 = st.columns(5)
 
         with col1:
-            st.metric("🟢 Login", latest["Login"])
+            st.markdown("**🟢 Login**")
+            st.markdown(f"<h4>{login_val}</h4>", unsafe_allow_html=True)
 
         with col2:
-            st.metric(
-                "🔴 Logout",
-                latest["Logout"] if str(latest["Logout"]).strip() else "Pending"
-            )
+            st.markdown("**🔴 Logout**")
+            st.markdown(f"<h4>{logout_val}</h4>", unsafe_allow_html=True)
 
         with col3:
-            st.metric("⏱ Hours", latest["Working Hours"])
+            st.markdown("**⏱ Hours**")
+            st.markdown(f"<h4>{hours_val}</h4>", unsafe_allow_html=True)
 
         with col4:
-            st.metric("📌 Status", latest["Status"])
+            st.markdown("**📌 Status**")
+            st.markdown(f"<h4>{status_val}</h4>", unsafe_allow_html=True)
 
         with col5:
-            st.metric("🏠 Type", latest["Type"])
+            st.markdown("**🏠 Type**")
+            st.markdown(f"<h4>{type_val}</h4>", unsafe_allow_html=True)
 
+        st.divider()
+
+        # ====================================================
+        # ✅ DETAILED TABLE
+        # ====================================================
         st.markdown("### 📄 Detailed Attendance")
 
         st.dataframe(
