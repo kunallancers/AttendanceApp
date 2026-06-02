@@ -586,23 +586,23 @@ if not df_today.empty:
 
         with col1:
             st.markdown("**🟢 Login**")
-            st.markdown(f"<p style='font-size:18px; margin:0;'>{login_val}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:17px; margin:0;'>{login_val}</p>", unsafe_allow_html=True)
 
         with col2:
             st.markdown("**🔴 Logout**")
-            st.markdown(f"<p style='font-size:18px; margin:0;'>{logout_val}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:17px; margin:0;'>{logout_val}</p>", unsafe_allow_html=True)
 
         with col3:
             st.markdown("**⏱ Hours**")
-            st.markdown(f"<p style='font-size:18px; margin:0;'>{hours_val}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:17px; margin:0;'>{hours_val}</p>", unsafe_allow_html=True)
 
         with col4:
             st.markdown("**📌 Status**")
-            st.markdown(f"<p style='font-size:18px; margin:0;'>{status_val}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:17px; margin:0;'>{status_val}</p>", unsafe_allow_html=True)
 
         with col5:
             st.markdown("**🏠 Type**")
-            st.markdown(f"<p style='font-size:18px; margin:0;'>{type_val}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='font-size:17px; margin:0;'>{type_val}</p>", unsafe_allow_html=True)
 
         st.divider()
 
