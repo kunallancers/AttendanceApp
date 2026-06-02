@@ -583,7 +583,15 @@ if not df_today.empty:
 
     if not today_data.empty:
 
-        latest = today_data.iloc[-1]
+        # SHOW ALL EMPLOYEES TODAY
+        latest_data = today_data.sort_values(by="Login")
+
+        st.dataframe(
+            latest_data[
+                ["Employee", "Login", "Logout", "Working Hours", "Status", "Type"]
+            ],
+            use_container_width=True
+        )
 
         # ✅ Safe extraction
         login_val = latest.get("Login", "")
@@ -629,35 +637,35 @@ if not df_today.empty:
 
         st.divider()
 
-        # ====================================================
-        # ✅ DETAILED TABLE
-        # ====================================================
         st.markdown("### 📄 Detailed Attendance")
 
-        st.dataframe(
-            today_data[
-                [
-                    "Date",
-                    "Employee",
-                    "Login",
-                    "Logout",
-                    "Working Hours",
-                    "Status",
-                    "Type",
-                    "Login Latitude",
-                    "Login Longitude",
-                    "Logout Latitude",
-                    "Logout Longitude"
-                ]
-            ],
-            use_container_width=True
-        )
+# ✅ Load full data instead of today_data
+df_full = load_attendance()
 
-    else:
-        st.info("No attendance recorded today.")
+if not df_full.empty:
+    df_full = df_full.sort_values(by=["Date", "Login"], ascending=[False, False])
+
+    st.dataframe(
+        df_full[
+            [
+                "Date",
+                "Employee",
+                "Login",
+                "Logout",
+                "Working Hours",
+                "Status",
+                "Type",
+                "Login Latitude",
+                "Login Longitude",
+                "Logout Latitude",
+                "Logout Longitude"
+            ]
+        ],
+        use_container_width=True
+    )
 
 else:
-    st.info("Attendance sheet is empty.")
+    st.info("No attendance records found.")
 
 # ============================================================
 # ✅ CLEAR ATTENDANCE (FINAL CLEAN VERSION)
