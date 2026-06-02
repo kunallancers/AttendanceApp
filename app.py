@@ -955,12 +955,13 @@ else:
     
     st.divider()
 # ============================================================
-# ✅ MONTHLY ATTENDANCE REPORT (FULL + CLEAN)
+# ✅ MONTHLY ATTENDANCE REPORT (FINAL CLEAN VERSION)
 # ============================================================
 
 st.subheader("📅 Monthly Attendance Report")
 
-monthly_df = df.copy()
+# ✅ Load data (IMPORTANT ✅)
+df = load_attendance()
 
 # ✅ Check if data exists
 if df.empty:
@@ -972,22 +973,59 @@ if "Date" not in df.columns:
     st.error("❌ Date column missing in data")
     st.stop()
 
-# ✅ Create Month column (ONLY ONCE ✅)
-df["Month"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m")
+# ========================================================
+# ✅ PREPARE DATA
+# ========================================================
 
-# ============================================================
+df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+df["Month"] = df["Date"].dt.strftime("%Y-%m")
+
+# ========================================================
+# ✅ FILTERS (NEW ✅)
+# ========================================================
+
+col1, col2 = st.columns(2)
+
+with col1:
+    month_list = sorted(df["Month"].dropna().unique(), reverse=True)
+
+    selected_month = st.selectbox(
+        "📅 Select Month",
+        month_list,
+        key="month_filter"
+    )
+
+with col2:
+    employee_list = ["All"] + sorted(df["Employee"].dropna().unique())
+
+    selected_employee = st.selectbox(
+        "👤 Select Employee",
+        employee_list,
+        key="employee_filter"
+    )
+
+# ✅ Optional search
+search = st.text_input("🔍 Search Employee")
+
+# ========================================================
 # ✅ FILTER DATA
-# ============================================================
+# ========================================================
 
 monthly_df = df[df["Month"] == selected_month]
 
+# ✅ Apply employee filter
+if selected_employee != "All":
+    monthly_df = monthly_df[
+        monthly_df["Employee"] == selected_employee
+    ]
+
+# ✅ Apply search filter
 if search:
     monthly_df = monthly_df[
         monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
     ]
 
 st.divider()
-
 
 # ============================================================
 # ✅ DASHBOARD SUMMARY (KPI CARDS)
