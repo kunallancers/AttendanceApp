@@ -585,48 +585,55 @@ else:
 # ✅ CLEAR ATTENDANCE (FINAL CLEAN VERSION)
 # ============================================================
 
+# ============================================================
+# ✅ ADMIN CONTROLS
+# ============================================================
+
 st.divider()
 
-# ✅ ADMIN ONLY
 if role == "admin":
 
     st.markdown("### ⚠️ Admin Controls")
 
+    # ✅ STEP 1 — Confirmation Checkbox
     confirm_clear = st.checkbox(
         "Confirm Clear Attendance",
         key="confirm_clear_attendance"
     )
 
+    # ✅ STEP 2 — Action Button
     if confirm_clear:
 
-        if st.button(
-            "🧹 Clear Attendance",
-            key="clear_attendance_btn"
-        ):
+        if st.button("🧹 Clear Attendance", key="clear_attendance_btn"):
 
-            sheet, _ = connect_sheet()
+            try:
+                sheet, _ = connect_sheet()
 
-            # ✅ Clear all rows
-            sheet.clear()
+                # ✅ Clear whole sheet
+                sheet.clear()
 
-            # ✅ Recreate header (IMPORTANT ✅)
-            sheet.append_row([
-                "Date",
-                "Employee",
-                "Login",
-                "Logout",
-                "Working Hours",
-                "Status",
-                "Type",
-                "Login Latitude",
-                "Login Longitude",
-                "Logout Latitude",
-                "Logout Longitude"
-            ])
+                # ✅ Recreate headers (VERY IMPORTANT)
+                sheet.append_row([
+                    "Date",
+                    "Employee",
+                    "Login",
+                    "Logout",
+                    "Working Hours",
+                    "Status",
+                    "Type",
+                    "Login Latitude",
+                    "Login Longitude",
+                    "Logout Latitude",
+                    "Logout Longitude"
+                ])
 
-            st.success("✅ Attendance Cleared Successfully")
+                st.success("✅ Attendance Cleared Successfully")
 
-            st.rerun()
+                # ✅ Refresh UI
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"❌ Error clearing attendance: {e}")
 
 if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
 
