@@ -368,39 +368,6 @@ attendance_type = st.selectbox(
 col1, col2, col3 = st.columns(3)
 
 # ============================================================
-# ✅ LOGIN ATTENDANCE
-# ============================================================
-with col1:
-
-    if st.button("🟢 Login Attendance"):
-
-        st.write("STEP 1 - Button Clicked")
-
-        # ✅ Fresh location (UNIQUE KEY)
-        loc = st.session_state.get("location", {})
-
-        lat = str(loc.get("lat", "NA"))
-        lon = str(loc.get("lon", "NA"))
-
-        sheet, _ = connect_sheet()
-        df = load_attendance()
-        
-        st.write("STEP 2 - Sheet Connected")
-        st.write(f"Employee: {employee}")
-        st.write(f"Date: {date_str}")
-        st.write(f"Location: {lat}, {lon}")
-
-        now = get_ist().strftime("%Y-%m-%d %H:%M:%S")
-
-        mask = (
-            (df["Date"] == date_str) &
-            (df["Employee"] == employee)
-        )
-
-        st.write("STEP 3 - Checking existing attendance")
-        st.write(f"Records Found: {len(df)}")
-        st.write(f"Match Found: {mask.any()}")
-       # ============================================================
 # ✅ LOGIN ATTENDANCE (FINAL COMPLETE VERSION)
 # ============================================================
 
