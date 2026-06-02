@@ -473,9 +473,6 @@ with col1:
 
         except Exception as e:
             st.error(f"STEP 4 ERROR: {e}")
-
-st.success(f"✅ Login Recorded\n📍 Location: {lat}, {lon}")
-
 # ============================================================
 # ✅ LOGOUT ATTENDANCE
 # ============================================================
