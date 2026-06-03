@@ -346,7 +346,8 @@ if role == "admin":
 
     employee = st.selectbox(
         "Select Employee",
-        sorted(df_emp["Employee Name"].unique())
+        sorted(df_emp["Employee Name"].unique()),
+        key="employee_admin_selector"
     )
 
 # ============================================================
