@@ -963,7 +963,6 @@ st.subheader("📅 Monthly Attendance Report")
 # ✅ Load data (IMPORTANT ✅)
 df = load_attendance()
 
-st.write("Columns:", df.columns)
 # ✅ Check if data exists
 if df.empty:
     st.info("⚠ No attendance data found")
@@ -993,7 +992,7 @@ with col1:
     selected_month = st.selectbox(
         "📅 Select Month",
         month_list,
-        key="month_filter"
+        key="month_filter_monthly"
     )
 
 
@@ -1011,7 +1010,7 @@ with col2:
     selected_employee = st.selectbox(
         "👤 Select Employee",
         employee_list,
-        key="employee_filter"
+        key="employee_filter_monthly"
     )
 
 # ✅ Optional search
