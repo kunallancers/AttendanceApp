@@ -1001,16 +1001,12 @@ df = load_attendance()
 
 df.columns = df.columns.str.strip()
 
-st.write("Columns:", df.columns)
-
 with col2:
     # ✅ Clean employee list (IMPORTANT ✅)
     employee_list = df["Employee"].dropna().astype(str).unique().tolist()
     employee_list = sorted(employee_list)
     employee_list = ["All"] + employee_list
 
-    st.write("Employee list:", employee_list)
-    
     # ✅ Dropdown
     selected_employee = st.selectbox(
         "👤 Select Employee",
