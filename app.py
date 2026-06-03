@@ -929,7 +929,7 @@ with col1:
     selected_month = st.selectbox(
         "📅 Select Month",
         sorted(df["Month"].dropna().unique(), reverse=True),
-        key="month_filter"
+        key="month_filter_v1"
     )
 
 with col2:
@@ -1010,12 +1010,16 @@ with col2:
     selected_employee = st.selectbox(
         "👤 Select Employee",
         employee_list,
-        key="employee_filter_monthly"
+        key="employee_filter_v1"
     )
 
-# ✅ Optional search
-search = st.text_input("🔍 Search Employee")
+monthly_df = df[df["Month"] == selected_month]
 
+
+if selected_employee != "All":
+    monthly_df = monthly_df[monthly_df["Employee"] == selected_employee]
+
+st.dataframe(monthly_df, use_container_width=True)
 # ========================================================
 # ✅ FILTER DATA
 # ========================================================
