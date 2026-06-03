@@ -925,13 +925,6 @@ if "Month" not in df.columns:
         errors="coerce"
     ).dt.strftime("%Y-%m")
     
-with col1:
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        sorted(df["Month"].dropna().unique(), reverse=True),
-        key="month_filter_v1"
-    )
-
 with col2:
     search = st.text_input("👤 Search Employee")
 
