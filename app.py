@@ -347,7 +347,7 @@ if role == "admin":
     employee = st.selectbox(
         "Select Employee",
         sorted(df_emp["Employee Name"].unique()),
-        key="employee_admin_selector"
+        key="employee_filter_admin"
     )
 
 # ============================================================
@@ -1016,20 +1016,29 @@ if "Date" not in df.columns:
     st.stop()
 
 # ========================================================
-# ✅ PREPARE DATA
+# ✅ PREPARE DATA (MUST COME FIRST ✅)
 # ========================================================
+
+df = load_attendance()
+
+df.columns = df.columns.str.strip()
 
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 df["Month"] = df["Date"].dt.strftime("%Y-%m")
 
 # ========================================================
-# ✅ FILTERS (NEW ✅)
+# ✅ FILTERS
 # ========================================================
 
 col1, col2 = st.columns(2)
 
+# ✅ Month filter
 with col1:
     month_list = sorted(df["Month"].dropna().unique(), reverse=True)
+
+    if not month_list:
+        st.info("No months available")
+        st.stop()
 
     selected_month = st.selectbox(
         "📅 Select Month",
@@ -1037,21 +1046,16 @@ with col1:
         key="month_filter_monthly"
     )
 
-
-df = load_attendance()
-
-df.columns = df.columns.str.strip()
-
+# ✅ Employee filter
 with col2:
-    # ✅ Clean employee list (IMPORTANT ✅)
     employee_list = df["Employee"].dropna().astype(str).unique().tolist()
     employee_list = sorted(employee_list)
     employee_list = ["All"] + employee_list
 
     selected_employee = st.selectbox(
-    "👤 Select Employee",
-    employee_list,
-    key="employee_filter_unique"
+        "👤 Select Employee",
+        employee_list,
+        key="employee_filter_monthly_v2"
     )
 
 # ========================================================
