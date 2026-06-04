@@ -971,24 +971,6 @@ with col2:
 search = st.text_input("🔍 Search Employee")
 
 # ============================================================
-# ✅ APPLY FILTERS
-# ============================================================
-
-monthly_df = df[df["Month"] == selected_month]
-
-if selected_employee != "All":
-    monthly_df = monthly_df[
-        monthly_df["Employee"] == selected_employee
-    ]
-
-if search:
-    monthly_df = monthly_df[
-        monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
-    ]
-
-st.divider()
-
-# ============================================================
 # ✅ KPI DASHBOARD (ADD HERE ✅)
 # ============================================================
 
@@ -1111,7 +1093,7 @@ with col2:
     )
 
 # ========================================================
-# ✅ FILTER DATA
+# ✅ FILTER DATA (FINAL CLEAN VERSION)
 # ========================================================
 
 monthly_df = df[df["Month"] == selected_month]
@@ -1127,6 +1109,10 @@ if search:
     monthly_df = monthly_df[
         monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
     ]
+
+# ✅ ✅ ADD YOUR FIXES HERE ✅
+monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
+monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
 
 st.divider()
 
