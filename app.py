@@ -974,23 +974,52 @@ search = st.text_input("🔍 Search Employee")
 # ✅ KPI DASHBOARD (ADD HERE ✅)
 # ============================================================
 
+# ========================================================
+# ✅ APPLY FILTERS (MUST COME FIRST ✅)
+# ========================================================
+
+monthly_df = df[df["Month"] == selected_month]
+
+if selected_employee != "All":
+    monthly_df = monthly_df[
+        monthly_df["Employee"] == selected_employee
+    ]
+
+if search:
+    monthly_df = monthly_df[
+        monthly_df["Employee"].astype(str).str.contains(
+            search, case=False, na=False
+        )
+    ]
+
+# ✅ Cleaning fixes
+monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
+monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
+
 st.markdown("### 📊 Summary")
 
-total_records = len(monthly_df)
-full_days = len(monthly_df[monthly_df["Status"] == "Full Day"])
-half_days = len(monthly_df[monthly_df["Status"] == "Half Day"])
+if not monthly_df.empty:
 
-col1, col2, col3 = st.columns(3)
+    total_records = len(monthly_df)
 
-with col1:
-    st.metric("📋 Total Records", total_records)
+    status_counts = monthly_df["Status"].astype(str).str.strip().value_counts()
 
-with col2:
-    st.metric("✅ Full Days", full_days)
+    full_days = status_counts.get("Full Day", 0)
+    half_days = status_counts.get("Half Day", 0)
 
-with col3:
-    st.metric("⏱ Half Days", half_days)
+    col1, col2, col3 = st.columns(3)
 
+    with col1:
+        st.metric("📋 Total Records", total_records)
+
+    with col2:
+        st.metric("✅ Full Days", full_days)
+
+    with col3:
+        st.metric("⏱ Half Days", half_days)
+
+else:
+    st.info("⚠ No data available for selected filters")
 # ============================================================
 # ✅ DISPLAY RESULT
 # ============================================================
