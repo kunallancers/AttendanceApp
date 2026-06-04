@@ -1039,7 +1039,7 @@ if not monthly_df.empty:
         **{"text-align": "center"}
     )
 
-    st.write(styled_df(styled_df, use_container_width=True)
+    st.write(styled_df, use_container_width=True)
 
 else:
     st.info("⚠ No data available for selected filters")
