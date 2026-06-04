@@ -347,7 +347,7 @@ if role == "admin":
     employee = st.selectbox(
         "Select Employee",
         sorted(df_emp["Employee Name"].unique()),
-        key="employee_admin_global"
+        key="employee_admin_selector"
     )
 
 # ============================================================
@@ -1000,22 +1000,12 @@ with col2:
     employee_list = sorted(employee_list)
     employee_list = ["All"] + employee_list
 
-    # ✅ Dropdown
-if "monthly_section" in st.session_state:
-    
     selected_employee = st.selectbox(
-        "👤 Select Employee",
-        employee_list,
-        key="employee_filter_v1"
+    "👤 Select Employee",
+    employee_list,
+    key="employee_filter_unique"
     )
 
-monthly_df = df[df["Month"] == selected_month]
-
-
-if selected_employee != "All":
-    monthly_df = monthly_df[monthly_df["Employee"] == selected_employee]
-
-st.dataframe(monthly_df, use_container_width=True)
 # ========================================================
 # ✅ FILTER DATA
 # ========================================================
