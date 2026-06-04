@@ -931,23 +931,71 @@ with col2:
 
 
 # ============================================================
+# ✅ PREPARE DATA
+# ============================================================
+
+df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+df["Month"] = df["Date"].dt.strftime("%Y-%m")
+
+# ============================================================
 # ✅ FILTER DATA
 # ============================================================
 
+col1, col2 = st.columns(2)
+
+# ✅ Month filter
+with col1:
+    month_list = sorted(df["Month"].dropna().unique(), reverse=True)
+
+    if not month_list:
+        st.info("No months available")
+        st.stop()
+
+    selected_month = st.selectbox(
+        "📅 Select Month",
+        month_list,
+        key="month_filter_unique"
+    )
+
+# ✅ Employee filter
+with col2:
+    employee_list = ["All"] + sorted(df["Employee"].dropna().astype(str).unique())
+
+    selected_employee = st.selectbox(
+        "👤 Select Employee",
+        employee_list,
+        key="employee_filter_unique"
+    )
+
+# ✅ Optional search
+search = st.text_input("🔍 Search Employee")
+
+# ============================================================
+# ✅ APPLY FILTERS
+# ============================================================
+
 monthly_df = df[df["Month"] == selected_month]
+
+if selected_employee != "All":
+    monthly_df = monthly_df[
+        monthly_df["Employee"] == selected_employee
+    ]
 
 if search:
     monthly_df = monthly_df[
         monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
     ]
 
+st.divider()
 
-    st.divider()
+# ============================================================
+# ✅ DISPLAY RESULT
+# ============================================================
 
+if not monthly_df.empty:
+    st.dataframe(monthly_df, use_container_width=True)
 else:
-    st.info("⚠ No data available for selected month")
-    
-    st.divider()
+    st.info("⚠ No data available for selected filters")
 # ============================================================
 # ✅ MONTHLY ATTENDANCE REPORT (FINAL CLEAN VERSION)
 # ============================================================
