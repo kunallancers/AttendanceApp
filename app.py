@@ -1028,26 +1028,26 @@ def highlight_status(val):
 # ✅ APPLY STYLING (SAFE VERSION)
 # ============================================================
 
-if isinstance(monthly_df, pd.DataFrame) and not monthly_df.empty:
+if not monthly_df.empty:
 
-    # ✅ Ensure Status column exists
-    if "Status" in monthly_df.columns:
+    def highlight_status(val):
+        if val == "Full Day":
+            return "background-color: #d4edda"
+        elif val == "Half Day":
+            return "background-color: #fff3cd"
+        elif val == "Absent":
+            return "background-color: #f8d7da"
+        else:
+            return ""
 
-        styled_df = (
-            monthly_df.style
-            .applymap(highlight_status, subset=["Status"])
-            .set_properties(subset=["Status"], **{"text-align": "center"})
-        )
+    styled_df = monthly_df.style.map(
+        highlight_status, subset=["Status"]
+    )
 
-        st.dataframe(styled_df, use_container_width=True)
-
-    else:
-        # fallback if column missing
-        st.dataframe(monthly_df, use_container_width=True)
+    st.dataframe(styled_df, use_container_width=True)
 
 else:
     st.info("⚠ No data available for selected filters")
-
 # ============================================================
 # ✅ MONTHLY ATTENDANCE REPORT (FINAL CLEAN VERSION)
 # ============================================================
