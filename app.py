@@ -1025,22 +1025,25 @@ def highlight_status(val):
         return ""
 
 # ============================================================
-# ✅ APPLY STYLING
+# ✅ APPLY STYLING (SAFE VERSION)
 # ============================================================
 
-if not monthly_df.empty:
+if isinstance(monthly_df, pd.DataFrame) and not monthly_df.empty:
 
-    styled_df = monthly_df.style.applymap(
-        highlight_status, subset=["Status"]
-    )
+    # ✅ Ensure Status column exists
+    if "Status" in monthly_df.columns:
 
-    styled_df = styled_df.set_properties(
-        subset=["Status"],
-        **{"text-align": "center"}
-    )
+        styled_df = (
+            monthly_df.style
+            .applymap(highlight_status, subset=["Status"])
+            .set_properties(subset=["Status"], **{"text-align": "center"})
+        )
 
-    
-    st.dataframe(styled_df, use_container_width=True)
+        st.dataframe(styled_df, use_container_width=True)
+
+    else:
+        # fallback if column missing
+        st.dataframe(monthly_df, use_container_width=True)
 
 else:
     st.info("⚠ No data available for selected filters")
