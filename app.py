@@ -991,11 +991,38 @@ st.divider()
 # ============================================================
 # ✅ DISPLAY RESULT
 # ============================================================
+st.divider()
+
+# ============================================================
+# ✅ KPI DASHBOARD (ADD HERE ✅)
+# ============================================================
+
+st.markdown("### 📊 Summary")
+
+total_records = len(monthly_df)
+full_days = len(monthly_df[monthly_df["Status"] == "Full Day"])
+half_days = len(monthly_df[monthly_df["Status"] == "Half Day"])
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric("📋 Total Records", total_records)
+
+with col2:
+    st.metric("✅ Full Days", full_days)
+
+with col3:
+    st.metric("⏱ Half Days", half_days)
+
+# ============================================================
+# ✅ DISPLAY RESULT
+# ============================================================
 
 if not monthly_df.empty:
     st.dataframe(monthly_df, use_container_width=True)
 else:
     st.info("⚠ No data available for selected filters")
+
 # ============================================================
 # ✅ MONTHLY ATTENDANCE REPORT (FINAL CLEAN VERSION)
 # ============================================================
