@@ -1013,8 +1013,34 @@ with col3:
 # ✅ DISPLAY RESULT
 # ============================================================
 
+
+def highlight_status(val):
+    if val == "Full Day":
+        return "background-color: #d4edda; color: black"
+    elif val == "Half Day":
+        return "background-color: #fff3cd; color: black"
+    elif val == "Absent":
+        return "background-color: #f8d7da; color: black"
+    else:
+        return ""
+
+# ============================================================
+# ✅ APPLY STYLING
+# ============================================================
+
 if not monthly_df.empty:
-    st.dataframe(monthly_df, use_container_width=True)
+
+    styled_df = monthly_df.style.applymap(
+        highlight_status, subset=["Status"]
+    )
+
+    styled_df = styled_df.set_properties(
+        subset=["Status"],
+        **{"text-align": "center"}
+    )
+
+    st.dataframe(styled_df, use_container_width=True)
+
 else:
     st.info("⚠ No data available for selected filters")
 
