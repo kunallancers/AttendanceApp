@@ -393,29 +393,57 @@ attendance_type = st.selectbox(
 # ============================================================
 col1, col2, col3 = st.columns(3)
 
-# ============================================================
-# ✅ LOGIN ATTENDANCE (FINAL DUPLICATE-PROOF VERSION)
-# ============================================================
-
 with col1:
 
     if st.button("🟢 Login Attendance", key="login_att_btn"):
 
         # ✅ Get stored location
         loc = st.session_state.get("location", {})
-        lat = str(loc.get("lat", "NA"))
-        lon = str(loc.get("lon", "NA"))
+        lat = loc.get("lat") or "NA"
+        lon = loc.get("lon") or "NA"
 
         # ✅ Connect & load data
         sheet, _ = connect_sheet()
         df = load_attendance()
+
         df.columns = df.columns.str.strip()
 
         df["Date"] = pd.to_datetime(
-        df["Date"], errors="coerce"
+            df["Date"], errors="coerce"
         ).dt.date
+
+        # ✅ ✅ FIX STARTS HERE ✅
+
+        today_date = date.today()                      # ✅ DATE OBJECT
+        date_str = today_date.strftime("%Y-%m-%d")     # ✅ CLEAN DATE
+
         now_dt = get_ist()
-        now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+        login_time_str = now_dt.strftime("%H:%M:%S")   # ✅ ONLY TIME
+
+        # ✅ ✅ CHECK DUPLICATE LOGIN
+        existing_today = df[
+            (df["Date"] == today_date) &
+            (df["Employee"] == employee)
+        ]
+
+        if not existing_today.empty:
+            st.warning("⚠ Already logged in today")
+            st.stop()
+
+        # ✅ SAVE DATA (CORRECT FORMAT ✅)
+        sheet.append_row([
+            date_str,           # ✅ FIXED DATE
+            employee,
+            login_time_str,     # ✅ login time only
+            "",                 # Logout
+            "",                 # Working Hours
+            "In Progress",
+            attendance_type
+        ])
+
+        st.success("✅ Login Recorded")
+
+        st.rerun()   # ✅ refresh immediately
 
         # ====================================================
         # ✅ STEP 1 — CHECK EXISTING ENTRY
