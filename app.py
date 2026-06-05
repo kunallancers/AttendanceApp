@@ -146,6 +146,15 @@ def load_attendance():
 
     return pd.DataFrame(data)
 
+df = load_attendance()
+
+# ✅ CLEAN DATA HERE (CORRECT PLACE ✅)
+df.columns = df.columns.str.strip()
+
+df["Date"] = pd.to_datetime(
+    df["Date"], errors="coerce"
+).dt.date
+
 # ============================================================
 # ✅ LOAD LEAVE
 # ============================================================
