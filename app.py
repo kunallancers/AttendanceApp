@@ -87,32 +87,42 @@ st.set_page_config(
 )
 
 # ============================================================
-# ✅ GOOGLE SHEET CONNECTION
+# ✅ GOOGLE SHEET CONNECTION (FINAL STABLE VERSION)
 # ============================================================
-import streamlit as st
 
+import streamlit as st
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 
+
+@st.cache_resource  # ✅ CRITICAL FIX (prevents API errors)
 def connect_sheet():
 
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
+    try:
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
 
-    creds_dict = st.secrets["gcp_service_account"]
+        # ✅ Load credentials
+        creds_dict = st.secrets["gcp_service_account"]
 
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(
-        creds_dict, scope
-    )
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(
+            creds_dict, scope
+        )
 
-    client = gspread.authorize(creds)
+        client = gspread.authorize(creds)
 
-    sheet = client.open("AttendanceData").sheet1
-    leave_sheet = client.open("AttendanceData").worksheet("Leave")
+        # ✅ Open sheets (ONLY ONCE due to caching)
+        sheet = client.open("AttendanceData").sheet1
+        leave_sheet = client.open("AttendanceData").worksheet("Leave")
 
-    return sheet, leave_sheet
+        return sheet, leave_sheet
+
+    except Exception as e:
+        st.error("❌ Google Sheet connection failed")
+        st.error(str(e))  # optional debug
+        st.stop()
 # ============================================================
 # ✅ IST TIME
 # ============================================================
@@ -127,6 +137,7 @@ def get_ist():
 # ============================================================
 # ✅ LOAD ATTENDANCE
 # ============================================================
+@st.cache_data(ttl=10)
 def load_attendance():
 
     sheet, _ = connect_sheet()
@@ -147,6 +158,11 @@ def load_attendance():
     return pd.DataFrame(data)
 
 df = load_attendance()
+df.columns = df.columns.str.strip()
+
+df["Date"] = pd.to_datetime(
+    df["Date"], errors="coerce"
+).dt.date
 
 # ✅ CLEAN DATA HERE (CORRECT PLACE ✅)
 df.columns = df.columns.str.strip()
@@ -393,7 +409,11 @@ with col1:
         # ✅ Connect & load data
         sheet, _ = connect_sheet()
         df = load_attendance()
+        df.columns = df.columns.str.strip()
 
+        df["Date"] = pd.to_datetime(
+        df["Date"], errors="coerce"
+        ).dt.date
         now_dt = get_ist()
         now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -650,7 +670,12 @@ if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
     st.write("✅ Button Clicked")
     sheet, _ = connect_sheet()
     df = load_attendance()
+    
+    df.columns = df.columns.str.strip()
 
+    df["Date"] = pd.to_datetime(
+    df["Date"], errors="coerce"
+    ).dt.date
     if df.empty:
         st.warning("No data found in sheet")
         st.stop()
@@ -852,7 +877,11 @@ if role == "admin":
 st.subheader("📋 Attendance Records")
 
 df = load_attendance()
+df.columns = df.columns.str.strip()
 
+df["Date"] = pd.to_datetime(
+    df["Date"], errors="coerce"
+).dt.date
 if not df.empty:
 
     # ========================================================
@@ -1076,7 +1105,11 @@ st.subheader("📅 Monthly Attendance Report")
 
 # ✅ Load data (IMPORTANT ✅)
 df = load_attendance()
+df.columns = df.columns.str.strip()
 
+df["Date"] = pd.to_datetime(
+    df["Date"], errors="coerce"
+).dt.date
 # ✅ Check if data exists
 if df.empty:
     st.info("⚠ No attendance data found")
