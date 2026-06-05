@@ -540,13 +540,21 @@ with col2:
             st.warning("⚠ No login record found")
 
 # ============================================================
-# ✅ TODAY'S ATTENDANCE STATUS (FINAL ALIGNED VERSION)
+# ✅ TODAY'S ATTENDANCE STATUS (FINAL FIXED VERSION)
 # ============================================================
 
 st.subheader("📋 Today's Attendance")
 
 df_today = load_attendance()
-today_str = date.today().strftime("%Y-%m-%d")
+
+# ✅ CLEAN DATA (CRITICAL FIX ✅)
+df_today.columns = df_today.columns.str.strip()
+
+df_today["Date"] = pd.to_datetime(
+    df_today["Date"], errors="coerce"
+).dt.date
+
+today_date = date.today()
 
 # ✅ Check if sheet is empty
 if df_today.empty:
@@ -557,10 +565,10 @@ else:
     # ✅ FILTER DATA (ADMIN vs EMPLOYEE)
     # ========================================================
     if role == "admin":
-        today_data = df_today[df_today["Date"] == today_str]
+        today_data = df_today[df_today["Date"] == today_date]
     else:
         today_data = df_today[
-            (df_today["Date"] == today_str) &
+            (df_today["Date"] == today_date) &
             (df_today["Employee"] == employee)
         ]
 
@@ -569,31 +577,25 @@ else:
     # ========================================================
     if not today_data.empty:
 
-        # ✅ Convert datetime safely
-        try:
-            today_data["Login"] = pd.to_datetime(
-                today_data["Login"], errors="coerce"
-            )
-            today_data["Logout"] = pd.to_datetime(
-                today_data["Logout"], errors="coerce"
-            )
-        except:
-            pass
+        # ✅ Convert to datetime for sorting
+        today_data["Login"] = pd.to_datetime(
+            today_data["Login"], errors="coerce"
+        )
+        today_data["Logout"] = pd.to_datetime(
+            today_data["Logout"], errors="coerce"
+        )
 
-        # ✅ Sort by login time
-        try:
-            today_data = today_data.sort_values(by="Login")
-        except:
-            pass
+        # ✅ Sort by login
+        today_data = today_data.sort_values(by="Login")
 
-        # ✅ Format time to HH:MM
-        try:
-            today_data["Login"] = today_data["Login"].dt.strftime("%H:%M")
-            today_data["Logout"] = today_data["Logout"].dt.strftime("%H:%M")
-        except:
-            pass
+        # ✅ Format time
+        today_data["Login"] = today_data["Login"].dt.strftime("%H:%M")
+        today_data["Logout"] = today_data["Logout"].dt.strftime("%H:%M")
 
-        # ✅ Show clean table
+        # ✅ Replace empty logout
+        today_data["Logout"] = today_data["Logout"].fillna("Pending")
+
+        # ✅ Display clean table
         st.dataframe(
             today_data[
                 [
