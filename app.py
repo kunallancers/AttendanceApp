@@ -431,12 +431,18 @@ with col1:
             st.stop()
 
         # ✅ SAVE DATA (CORRECT FORMAT ✅)
+        today_date = date.today().strftime("%Y-%m-%d")
+
+        now_dt = get_ist()
+
+        login_time = now_dt.strftime("%H:%M:%S")   # ✅ ONLY TIME
+
         sheet.append_row([
-            date_str,           # ✅ FIXED DATE
+            today_date,       # ✅ Date column
             employee,
-            login_time_str,     # ✅ login time only
-            "",                 # Logout
-            "",                 # Working Hours
+            login_time,       # ✅ ONLY TIME (FIX ✅)
+            "",               # Logout
+            "",               # Working Hours
             "In Progress",
             attendance_type
         ])
@@ -575,71 +581,47 @@ st.subheader("📋 Today's Attendance")
 
 df_today = load_attendance()
 
-# ✅ CLEAN DATA (CRITICAL FIX ✅)
 df_today.columns = df_today.columns.str.strip()
 
+# ✅ Convert DATE properly
 df_today["Date"] = pd.to_datetime(
     df_today["Date"], errors="coerce"
 ).dt.date
 
 today_date = date.today()
 
-# ✅ Check if sheet is empty
-if df_today.empty:
-    st.info("Attendance sheet is empty.")
+# ✅ Filter
+if role == "admin":
+    today_data = df_today[df_today["Date"] == today_date]
+else:
+    today_data = df_today[
+        (df_today["Date"] == today_date) &
+        (df_today["Employee"] == employee)
+    ]
+
+# ✅ Display
+if not today_data.empty:
+
+    # ✅ Convert login/logout safely
+    today_data["Login"] = pd.to_datetime(
+        today_data["Login"], errors="coerce"
+    ).dt.strftime("%H:%M")
+
+    today_data["Logout"] = pd.to_datetime(
+        today_data["Logout"], errors="coerce"
+    ).dt.strftime("%H:%M")
+
+    today_data["Logout"] = today_data["Logout"].fillna("Pending")
+
+    st.dataframe(
+        today_data[
+            ["Employee", "Login", "Logout", "Working Hours", "Status", "Type"]
+        ],
+        use_container_width=True
+    )
 
 else:
-    # ========================================================
-    # ✅ FILTER DATA (ADMIN vs EMPLOYEE)
-    # ========================================================
-    if role == "admin":
-        today_data = df_today[df_today["Date"] == today_date]
-    else:
-        today_data = df_today[
-            (df_today["Date"] == today_date) &
-            (df_today["Employee"] == employee)
-        ]
-
-    # ========================================================
-    # ✅ DISPLAY TODAY DATA
-    # ========================================================
-    if not today_data.empty:
-
-        # ✅ Convert to datetime for sorting
-        today_data["Login"] = pd.to_datetime(
-            today_data["Login"], errors="coerce"
-        )
-        today_data["Logout"] = pd.to_datetime(
-            today_data["Logout"], errors="coerce"
-        )
-
-        # ✅ Sort by login
-        today_data = today_data.sort_values(by="Login")
-
-        # ✅ Format time
-        today_data["Login"] = today_data["Login"].dt.strftime("%H:%M")
-        today_data["Logout"] = today_data["Logout"].dt.strftime("%H:%M")
-
-        # ✅ Replace empty logout
-        today_data["Logout"] = today_data["Logout"].fillna("Pending")
-
-        # ✅ Display clean table
-        st.dataframe(
-            today_data[
-                [
-                    "Employee",
-                    "Login",
-                    "Logout",
-                    "Working Hours",
-                    "Status",
-                    "Type"
-                ]
-            ],
-            use_container_width=True
-        )
-
-    else:
-        st.info("No attendance recorded today.")
+    st.info("No attendance recorded today.")
 
 # ============================================================
 # ✅ CLEAR ATTENDANCE (FINAL CLEAN VERSION)
