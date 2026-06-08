@@ -535,26 +535,33 @@ with col2:
             df["Date"], errors="coerce"
         ).dt.date
 
-        today_date = date.today()
-
-        # ✅ Find today's login
-        user_today = df[
-            (df["Date"] == today_date) &
-            (df["Employee"] == employee)
-        ]
-
-        if user_today.empty:
-            st.warning("⚠ No login record found")
-            st.stop()
-
-        # ✅ Latest login row
-        last_index = user_today.index[-1]
-
         # ============================================================
-# ✅ TIME CALCULATIONS (FINAL FIXED VERSION)
+# ✅ FIND TODAY LOGIN RECORD
 # ============================================================
 
-# ✅ Get login time string from sheet
+today_date = date.today()
+
+user_today = df[
+    (df["Date"] == today_date) &
+    (df["Employee"] == employee)
+]
+
+# ✅ Check if login exists
+if user_today.empty:
+    st.warning("⚠ No login record found")
+    st.stop()
+
+# ============================================================
+# ✅ GET LAST LOGIN ENTRY
+# ============================================================
+
+last_index = user_today.index[-1]
+
+# ============================================================
+# ✅ TIME CALCULATIONS
+# ============================================================
+
+# ✅ Get login time string
 login_str = str(user_today.iloc[-1]["Login"])
 
 # ✅ Convert login datetime safely
@@ -571,13 +578,12 @@ if pd.isna(login_time):
     st.error("❌ Invalid login time format")
     st.stop()
 
-# ✅ Calculate working duration
+# ✅ Calculate duration
 time_diff = logout_time - login_time
 
-# ✅ Convert to readable HH:MM:SS
 working_hours = str(time_diff).split(".")[0]
 
-# ✅ Total working hours (for status logic)
+# ✅ Total hours
 total_seconds = time_diff.total_seconds()
 total_hours = total_seconds / 3600
 
