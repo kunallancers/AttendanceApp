@@ -314,27 +314,46 @@ if location and location.get("latitude") and location.get("longitude"):
         "lon": location["longitude"]
     }
 
-# ✅ SINGLE SOURCE OF TRUTH ✅
+# ============================================================
+# ✅ SINGLE SOURCE OF TRUTH FOR LOCATION
+# ============================================================
+
 def get_location_values():
+
     loc = st.session_state.get("location", {})
+
     lat = loc.get("lat") or "NA"
     lon = loc.get("lon") or "NA"
+
     return lat, lon
+
+
 # ============================================================
 # ✅ STEP 3: DISPLAY LOCATION
 # ============================================================
+
+# ✅ Get latest values FIRST (IMPORTANT ✅)
+lat, lon = get_location_values()
+
 st.write("📍 Current Location:")
+
 st.write(f"Latitude: {lat}")
 st.write(f"Longitude: {lon}")
 
-# ✅ Google Maps link
-if lat != "NA" and lon != "NA":
-    st.markdown(f"https://www.google.com/maps?q={lat},{lon}")
+# ============================================================
+# ✅ GOOGLE MAPS LINK
+# ============================================================
 
-# ✅ Status message
-if lat != "NA":
+if lat != "NA" and lon != "NA":
+
+    st.markdown(
+        f"[🌍 Open in Google Maps](https://www.google.com/maps?q={lat},{lon})"
+    )
+
     st.success("📍 Location captured successfully ✅")
+
 else:
+
     st.warning("⚠ Please allow location access in your browser")
 
 # ============================================================
