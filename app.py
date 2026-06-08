@@ -581,40 +581,75 @@ working_hours = str(time_diff).split(".")[0]
 total_seconds = time_diff.total_seconds()
 total_hours = total_seconds / 3600
 
-        # ✅ Sheet row number
-        row_number = last_index + 2
+# ============================================================
+# ✅ UPDATE LOGOUT DETAILS IN GOOGLE SHEET
+# ============================================================
 
-        # ✅ Update Logout Time
-        sheet.update_cell(
-            row_number,
-            4,
-            logout_time.strftime("%H:%M:%S")
-        )
+# ✅ Sheet row number
+row_number = last_index + 2
 
-        # ✅ Update Working Hours
-        sheet.update_cell(
-            row_number,
-            5,
-            working_hours
-        )
+# ============================================================
+# ✅ UPDATE LOGOUT TIME
+# ============================================================
 
-        # ✅ Attendance Status Logic
-        if total_hours >= 8:
-            status = "Full Day"
-        else:
-            status = "Half Day"
+sheet.update_cell(
+    row_number,
+    4,   # Logout column
+    logout_time.strftime("%H:%M:%S")
+)
 
-        sheet.update_cell(
-            row_number,
-            6,
-            status
-        )
+# ============================================================
+# ✅ UPDATE WORKING HOURS
+# ============================================================
 
-        st.success(
-            f"✅ Logout Recorded 📍 Location: {lat}, {lon}"
-        )
+sheet.update_cell(
+    row_number,
+    5,   # Working Hours column
+    working_hours
+)
 
-        st.rerun()
+# ============================================================
+# ✅ ATTENDANCE STATUS LOGIC
+# ============================================================
+
+if total_hours >= 8:
+    status = "Full Day"
+elif total_hours >= 4:
+    status = "Half Day"
+else:
+    status = "Short Day"
+
+# ============================================================
+# ✅ UPDATE STATUS
+# ============================================================
+
+sheet.update_cell(
+    row_number,
+    6,   # Status column
+    status
+)
+
+# ============================================================
+# ✅ SUCCESS MESSAGE
+# ============================================================
+
+st.success(
+    f"""
+    ✅ Logout Recorded Successfully
+
+    📍 Location: {lat}, {lon}
+
+    ⏱ Working Hours: {working_hours}
+
+    📌 Status: {status}
+    """
+)
+
+# ============================================================
+# ✅ REFRESH APP
+# ============================================================
+
+st.rerun()
 
 # ============================================================
 # ✅ TODAY'S ATTENDANCE STATUS (FINAL FIXED VERSION)
