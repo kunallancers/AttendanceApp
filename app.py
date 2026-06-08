@@ -550,21 +550,36 @@ with col2:
         # ✅ Latest login row
         last_index = user_today.index[-1]
 
-        # ✅ Time calculations
-        login_time = pd.to_datetime(
-            user_today.iloc[-1]["Login"],
-            errors="coerce"
-        )
+        # ============================================================
+# ✅ TIME CALCULATIONS (FINAL FIXED VERSION)
+# ============================================================
 
-        logout_time = get_ist()
+# ✅ Get login time string from sheet
+login_str = str(user_today.iloc[-1]["Login"])
 
-        time_diff = logout_time - login_time
+# ✅ Convert login datetime safely
+login_time = pd.to_datetime(
+    f"{today_date} {login_str}",
+    errors="coerce"
+)
 
-        working_hours = str(time_diff).split(".")[0]
+# ✅ Current logout datetime
+logout_time = pd.to_datetime(get_ist())
 
-        # ✅ Convert to hours
-        total_seconds = time_diff.total_seconds()
-        total_hours = total_seconds / 3600
+# ✅ Validate login time
+if pd.isna(login_time):
+    st.error("❌ Invalid login time format")
+    st.stop()
+
+# ✅ Calculate working duration
+time_diff = logout_time - login_time
+
+# ✅ Convert to readable HH:MM:SS
+working_hours = str(time_diff).split(".")[0]
+
+# ✅ Total working hours (for status logic)
+total_seconds = time_diff.total_seconds()
+total_hours = total_seconds / 3600
 
         # ✅ Sheet row number
         row_number = last_index + 2
