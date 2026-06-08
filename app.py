@@ -302,6 +302,7 @@ with col1:
 # ✅ LOCATION INITIALIZATION + FETCH
 # ============================================================
 
+
 if "location" not in st.session_state:
     st.session_state["location"] = {}
 
@@ -313,17 +314,12 @@ if location and location.get("latitude") and location.get("longitude"):
         "lon": location["longitude"]
     }
 
-# Get location values safely
-loc = st.session_state.get("location", {})
-
-lat = str(loc.get("lat", "NA"))
-lon = str(loc.get("lon", "NA"))
-
-# ✅ Read stored location
-loc = st.session_state.get("location", {})
-
-lat = str(loc.get("lat", "NA"))
-lon = str(loc.get("lon", "NA"))
+# ✅ SINGLE SOURCE OF TRUTH ✅
+def get_location_values():
+    loc = st.session_state.get("location", {})
+    lat = loc.get("lat") or "NA"
+    lon = loc.get("lon") or "NA"
+    return lat, lon
 # ============================================================
 # ✅ STEP 3: DISPLAY LOCATION
 # ============================================================
@@ -393,34 +389,40 @@ attendance_type = st.selectbox(
 # ============================================================
 col1, col2, col3 = st.columns(3)
 
+
 with col1:
 
     if st.button("🟢 Login Attendance", key="login_att_btn"):
 
-        # ✅ Get stored location
-        loc = st.session_state.get("location", {})
-        lat = loc.get("lat") or "NA"
-        lon = loc.get("lon") or "NA"
+        # ✅ Get location
+        lat, lon = get_location_values()
 
-        # ✅ Connect & load data
+        # ✅ Connect and load attendance
         sheet, _ = connect_sheet()
+
         df = load_attendance()
 
+        # ✅ Clean columns
         df.columns = df.columns.str.strip()
 
+        # ✅ Normalize date
         df["Date"] = pd.to_datetime(
             df["Date"], errors="coerce"
         ).dt.date
 
-        # ✅ ✅ FIX STARTS HERE ✅
+        # ✅ Current date and time
+        today_date = date.today()
 
-        today_date = date.today()                      # ✅ DATE OBJECT
-        date_str = today_date.strftime("%Y-%m-%d")     # ✅ CLEAN DATE
+        date_str = today_date.strftime("%Y-%m-%d")
 
         now_dt = get_ist()
-        login_time_str = now_dt.strftime("%H:%M:%S")   # ✅ ONLY TIME
 
-        # ✅ ✅ CHECK DUPLICATE LOGIN
+        login_time_str = now_dt.strftime("%H:%M:%S")
+
+        # ====================================================
+        # ✅ CHECK DUPLICATE LOGIN
+        # ====================================================
+
         existing_today = df[
             (df["Date"] == today_date) &
             (df["Employee"] == employee)
@@ -430,26 +432,29 @@ with col1:
             st.warning("⚠ Already logged in today")
             st.stop()
 
-        # ✅ SAVE DATA (CORRECT FORMAT ✅)
-        today_date = date.today().strftime("%Y-%m-%d")
-
-        now_dt = get_ist()
-
-        login_time = now_dt.strftime("%H:%M:%S")   # ✅ ONLY TIME
+        # ====================================================
+        # ✅ SAVE ATTENDANCE
+        # ====================================================
 
         sheet.append_row([
-            today_date,       # ✅ Date column
-            employee,
-            login_time,       # ✅ ONLY TIME (FIX ✅)
-            "",               # Logout
-            "",               # Working Hours
-            "In Progress",
-            attendance_type
+            date_str,          # Date
+            employee,          # Employee
+            login_time_str,    # Login Time
+            "",                # Logout
+            "",                # Working Hours
+            "In Progress",     # Status
+            attendance_type,   # Type
+            lat,               # Latitude
+            lon                # Longitude
         ])
 
-        st.success("✅ Login Recorded")
+        # ✅ Success message
+        st.success(
+            f"✅ Login Recorded 📍 Location: {lat}, {lon}"
+        )
 
-        st.rerun()   # ✅ refresh immediately
+        # ✅ Refresh app
+        st.rerun()
 
         # ====================================================
         # ✅ STEP 1 — CHECK EXISTING ENTRY
@@ -490,88 +495,92 @@ with col1:
         except Exception as e:
             st.error(f"❌ Error saving data: {e}")
 # ============================================================
-# ✅ LOGOUT ATTENDANCE
+# ✅ LOGOUT ATTENDANCE (FINAL CLEAN VERSION)
 # ============================================================
+
 with col2:
 
     if st.button("🔴 Logout Attendance"):
-        sheet, _ = connect_sheet()
-        # ✅ Get stored location
-        loc = st.session_state.get("location", {})
 
-        lat = str(loc.get("lat", "NA"))
-        lon = str(loc.get("lon", "NA"))
+        lat, lon = get_location_values()
 
         sheet, _ = connect_sheet()
+
         df = load_attendance()
 
-        now_dt = get_ist()
-        now_str = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+        # ✅ Clean columns
+        df.columns = df.columns.str.strip()
 
-        mask = (
-            (df["Date"] == date_str) &
+        # ✅ Normalize date
+        df["Date"] = pd.to_datetime(
+            df["Date"], errors="coerce"
+        ).dt.date
+
+        today_date = date.today()
+
+        # ✅ Find today's login
+        user_today = df[
+            (df["Date"] == today_date) &
             (df["Employee"] == employee)
+        ]
+
+        if user_today.empty:
+            st.warning("⚠ No login record found")
+            st.stop()
+
+        # ✅ Latest login row
+        last_index = user_today.index[-1]
+
+        # ✅ Time calculations
+        login_time = pd.to_datetime(
+            user_today.iloc[-1]["Login"],
+            errors="coerce"
         )
 
-        if not df.empty and mask.any():
+        logout_time = get_ist()
 
-            idx = df[mask].index[0]
-            row_number = idx + 2
+        time_diff = logout_time - login_time
 
-            login_value = df.at[idx, "Login"]
-            existing_logout = df.at[idx, "Logout"]
+        working_hours = str(time_diff).split(".")[0]
 
-            # ✅ Prevent duplicate logout
-            if pd.notna(existing_logout) and str(existing_logout).strip() != "":
-                st.warning("⚠ Already Logged Out")
-                st.stop()
+        # ✅ Convert to hours
+        total_seconds = time_diff.total_seconds()
+        total_hours = total_seconds / 3600
 
-            # ✅ Update logout time
-            sheet.update_cell(row_number, 4, now_str)
+        # ✅ Sheet row number
+        row_number = last_index + 2
 
-            # ✅ Calculate working hours
-            try:
-                login_dt = pd.to_datetime(login_value)
-                now_dt = get_ist()
-                
-                
-                time_diff = now_dt - login_dt
-                
-                
-                total_seconds = int(time_diff.total_seconds())
+        # ✅ Update Logout Time
+        sheet.update_cell(
+            row_number,
+            4,
+            logout_time.strftime("%H:%M:%S")
+        )
 
+        # ✅ Update Working Hours
+        sheet.update_cell(
+            row_number,
+            5,
+            working_hours
+        )
 
-                hours = (now_dt - login_dt).total_seconds() / 3600
-                hours = round(hours, 2)
-                minutes = (total_seconds % 3600) // 60
-
-                working_hours = f"{hours:02d}:{minutes:02d}"   # ✅ HH:MM format
-            except:
-                hours = 0
-
-            # ✅ Save working hours
-            
-            sheet.update_cell(row_number, 5, working_hours)
-
-
-            # ✅ Update status
-            if hours >= 8:
-                status = "Full Day"
-            elif hours >= 6:
-                status = "Half Day"
-            else:
-                status = "Absent"
-
-            sheet.update_cell(row_number, 6, status)
-
-            # ✅ Save logout location
-            sheet.update_cell(row_number, 10, lat)
-            sheet.update_cell(row_number, 11, lon)
-
-            st.success(f"✅ Logout Recorded\n⏱ Hours: {hours} hrs\n📍 Location: {lat}, {lon}")
-
+        # ✅ Attendance Status Logic
+        if total_hours >= 8:
+            status = "Full Day"
         else:
-            st.warning("⚠ No login record found")
+            status = "Half Day"
+
+        sheet.update_cell(
+            row_number,
+            6,
+            status
+        )
+
+        st.success(
+            f"✅ Logout Recorded 📍 Location: {lat}, {lon}"
+        )
+
+        st.rerun()
 
 # ============================================================
 # ✅ TODAY'S ATTENDANCE STATUS (FINAL FIXED VERSION)
