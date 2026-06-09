@@ -1044,21 +1044,6 @@ with col2:
         key="employee_filter_unique"
     )
 
-# ========================================================
-# ✅ APPLY FILTERS
-# ========================================================
-
-monthly_df = df[
-    df["Month"] == selected_month
-]
-
-# ✅ Employee filter
-if selected_employee != "All":
-
-    monthly_df = monthly_df[
-        monthly_df["Employee"] == selected_employee
-    ]
-
 # ✅ Cleaning fixes
 monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
 monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
@@ -1203,12 +1188,12 @@ with col2:
 # ========================================================
 
 # ✅ Prepare Month List
+# ✅ Month List
 month_list = sorted(
     df["Month"].dropna().unique(),
     reverse=True
 )
 
-# ✅ Filters Layout
 col1, col2 = st.columns(2)
 
 # ✅ Month Filter
@@ -1216,8 +1201,7 @@ with col1:
 
     selected_month = st.selectbox(
         "📅 Select Month",
-        month_list,
-        key="month_filter_final"
+        month_list
     )
 
 # ✅ Employee Filter
@@ -1229,9 +1213,19 @@ with col2:
 
     selected_employee = st.selectbox(
         "👤 Select Employee",
-        employee_list,
-        key="employee_filter_final"
+        employee_list
     )
+
+# ✅ Apply Filters
+monthly_df = df[
+    df["Month"] == selected_month
+]
+
+if selected_employee != "All":
+
+    monthly_df = monthly_df[
+        monthly_df["Employee"] == selected_employee
+    ]
 
 # ========================================================
 # ✅ APPLY FILTERS
