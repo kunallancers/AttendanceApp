@@ -419,39 +419,50 @@ with col1:
 
         sheet, _ = connect_sheet()
 
+        # ✅ Load latest attendance
         df = load_attendance()
 
+        # ✅ Clean dataframe
         df.columns = df.columns.str.strip()
 
+        # ✅ Normalize Date
         df["Date"] = pd.to_datetime(
             df["Date"],
             errors="coerce"
-        ).dt.date
+        ).dt.strftime("%Y-%m-%d")
 
+        # ✅ Current Date & Time
         today_date = date.today()
 
         date_str = today_date.strftime("%Y-%m-%d")
 
-        now_dt = get_ist()
+        login_time_str = get_ist().strftime("%H:%M:%S")
 
-        login_time_str = now_dt.strftime("%H:%M:%S")
+        # ====================================================
+        # ✅ CHECK EXISTING LOGIN
+        # ====================================================
 
         existing_today = df[
-            (df["Date"] == today_date) &
+            (df["Date"] == date_str) &
             (df["Employee"] == employee)
         ]
 
+        # ✅ Prevent duplicate only if logout pending
         if not existing_today.empty:
 
-            logout_value = str(
+            last_logout = str(
                 existing_today.iloc[-1]["Logout"]
             ).strip()
 
-            if logout_value in ["", "nan", "None"]:
+            if last_logout in ["", "nan", "None"]:
 
                 st.warning("⚠ Already logged in today")
 
                 st.stop()
+
+        # ====================================================
+        # ✅ SAVE LOGIN
+        # ====================================================
 
         sheet.append_row([
             date_str,
@@ -467,12 +478,14 @@ with col1:
             ""
         ])
 
+        # ✅ Clear cache
         load_attendance.clear()
 
         st.success(
-            f"✅ Login Recorded 📍 Location: {lat}, {lon}"
+            f"✅ Login Recorded Successfully 📍 {lat}, {lon}"
         )
 
+        # ✅ Refresh immediately
         st.rerun()
 
 # ============================================================
@@ -623,9 +636,9 @@ df_today.columns = df_today.columns.str.strip()
 df_today["Date"] = pd.to_datetime(
     df_today["Date"],
     errors="coerce"
-).dt.date
+).dt.strftime("%Y-%m-%d")
 
-today_date = date.today()
+today_date = date.today().strftime("%Y-%m-%d")
 
 if role == "admin":
 
