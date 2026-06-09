@@ -434,7 +434,7 @@ with col1:
         # ✅ Current Date & Time
         today_date = date.today().strftime("%Y-%m-%d")
 
-        date_str = today_date.strftime("%Y-%m-%d")
+        date_str = today_date
 
         login_time_str = get_ist().strftime("%H:%M:%S")
 
