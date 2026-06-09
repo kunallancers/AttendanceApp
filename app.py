@@ -1044,21 +1044,6 @@ with col2:
         key="employee_filter_unique"
     )
 
-# ========================================================
-# ✅ FILTER DATA
-# ========================================================
-
-monthly_df = df[
-    df["Month"] == selected_month
-]
-
-# ✅ Employee filter
-if selected_employee != "All":
-
-    monthly_df = monthly_df[
-        monthly_df["Employee"] == selected_employee
-    ]
-
 # ============================================================
 # ✅ CLEANING FIXES
 # ============================================================
