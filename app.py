@@ -1202,6 +1202,41 @@ with col2:
 # ✅ FILTER DATA
 # ========================================================
 
+# ✅ Prepare Month List
+month_list = sorted(
+    df["Month"].dropna().unique(),
+    reverse=True
+)
+
+# ✅ Filters Layout
+col1, col2 = st.columns(2)
+
+# ✅ Month Filter
+with col1:
+
+    selected_month = st.selectbox(
+        "📅 Select Month",
+        month_list,
+        key="month_filter_final"
+    )
+
+# ✅ Employee Filter
+with col2:
+
+    employee_list = ["All"] + sorted(
+        df["Employee"].dropna().unique()
+    )
+
+    selected_employee = st.selectbox(
+        "👤 Select Employee",
+        employee_list,
+        key="employee_filter_final"
+    )
+
+# ========================================================
+# ✅ APPLY FILTERS
+# ========================================================
+
 monthly_df = df[
     df["Month"] == selected_month
 ]
