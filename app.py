@@ -169,13 +169,6 @@ df["Date"] = pd.to_datetime(
     df["Date"], errors="coerce"
 ).dt.date
 
-# ✅ CLEAN DATA HERE (CORRECT PLACE ✅)
-df.columns = df.columns.str.strip()
-
-df["Date"] = pd.to_datetime(
-    df["Date"], errors="coerce"
-).dt.date
-
 # ============================================================
 # ✅ LOAD LEAVE
 # ============================================================
@@ -1036,10 +1029,6 @@ if "Month" not in df.columns:
         errors="coerce"
     ).dt.strftime("%Y-%m")
     
-with col2:
-    search = st.text_input("👤 Search Employee")
-
-
 # ============================================================
 # ✅ PREPARE DATA
 # ============================================================
@@ -1077,13 +1066,6 @@ with col2:
         key="employee_filter_unique"
     )
 
-# ✅ Optional search
-search = st.text_input("🔍 Search Employee")
-
-# ============================================================
-# ✅ KPI DASHBOARD (ADD HERE ✅)
-# ============================================================
-
 # ========================================================
 # ✅ APPLY FILTERS (MUST COME FIRST ✅)
 # ========================================================
@@ -1093,13 +1075,6 @@ monthly_df = df[df["Month"] == selected_month]
 if selected_employee != "All":
     monthly_df = monthly_df[
         monthly_df["Employee"] == selected_employee
-    ]
-
-if search:
-    monthly_df = monthly_df[
-        monthly_df["Employee"].astype(str).str.contains(
-            search, case=False, na=False
-        )
     ]
 
 # ✅ Cleaning fixes
