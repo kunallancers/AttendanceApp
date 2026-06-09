@@ -432,9 +432,7 @@ with col1:
         ).dt.strftime("%Y-%m-%d")
 
         # ✅ Current Date & Time
-        today_date = date.today().strftime("%Y-%m-%d")
-
-        date_str = today_date
+        date_str = date.today().strftime("%Y-%m-%d")
 
         login_time_str = get_ist().strftime("%H:%M:%S")
 
@@ -1043,13 +1041,6 @@ if "Month" not in df.columns:
     ).dt.strftime("%Y-%m")
     
 # ============================================================
-# ✅ PREPARE DATA
-# ============================================================
-
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-df["Month"] = df["Date"].dt.strftime("%Y-%m")
-
-# ============================================================
 # ✅ FILTER DATA
 # ============================================================
 
@@ -1080,12 +1071,16 @@ with col2:
     )
 
 # ========================================================
-# ✅ APPLY FILTERS (MUST COME FIRST ✅)
+# ✅ APPLY FILTERS
 # ========================================================
 
-monthly_df = df[df["Month"] == selected_month]
+monthly_df = df[
+    df["Month"] == selected_month
+]
 
+# ✅ Employee filter
 if selected_employee != "All":
+
     monthly_df = monthly_df[
         monthly_df["Employee"] == selected_employee
     ]
@@ -1181,14 +1176,20 @@ if "Date" not in df.columns:
     st.stop()
 
 # ========================================================
-# ✅ PREPARE DATA (MUST COME FIRST ✅)
+# ✅ PREPARE DATA (FINAL VERSION ✅)
 # ========================================================
 
 df = load_attendance()
 
 df.columns = df.columns.str.strip()
 
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+# ✅ Convert Date safely
+df["Date"] = pd.to_datetime(
+    df["Date"],
+    errors="coerce"
+)
+
+# ✅ Create Month column
 df["Month"] = df["Date"].dt.strftime("%Y-%m")
 
 # ========================================================
@@ -1224,13 +1225,16 @@ with col2:
     )
 
 # ========================================================
-# ✅ FILTER DATA (FINAL CLEAN VERSION)
+# ✅ FILTER DATA
 # ========================================================
 
-monthly_df = df[df["Month"] == selected_month]
+monthly_df = df[
+    df["Month"] == selected_month
+]
 
-# ✅ Apply employee filter
+# ✅ Employee filter
 if selected_employee != "All":
+
     monthly_df = monthly_df[
         monthly_df["Employee"] == selected_employee
     ]
