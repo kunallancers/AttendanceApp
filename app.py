@@ -953,11 +953,20 @@ if role == "admin":
 st.subheader("📋 Attendance Records")
 
 df = load_attendance()
+
 df.columns = df.columns.str.strip()
 
 df["Date"] = pd.to_datetime(
-    df["Date"], errors="coerce"
+    df["Date"],
+    errors="coerce"
 ).dt.strftime("%Y-%m-%d")
+
+# ✅ ADD THIS
+df["Month"] = pd.to_datetime(
+    df["Date"],
+    errors="coerce"
+).dt.strftime("%Y-%m")
+
 if not df.empty:
 
     # ========================================================
