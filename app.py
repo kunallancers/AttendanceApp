@@ -167,7 +167,7 @@ df.columns = df.columns.str.strip()
 
 df["Date"] = pd.to_datetime(
     df["Date"], errors="coerce"
-).dt.date
+).dt.strftime("%Y-%m-%d")
 
 # ============================================================
 # ✅ LOAD LEAVE
@@ -432,7 +432,7 @@ with col1:
         ).dt.strftime("%Y-%m-%d")
 
         # ✅ Current Date & Time
-        today_date = date.today()
+        today_date = date.today().strftime("%Y-%m-%d")
 
         date_str = today_date.strftime("%Y-%m-%d")
 
@@ -507,7 +507,7 @@ with col2:
         df["Date"] = pd.to_datetime(
             df["Date"],
             errors="coerce"
-        ).dt.date
+        ).dt.strftime("%Y-%m-%d")
 
         today_date = date.today()
 
@@ -751,7 +751,7 @@ if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
 
     df["Date"] = pd.to_datetime(
     df["Date"], errors="coerce"
-    ).dt.date
+    ).dt.strftime("%Y-%m-%d")
     if df.empty:
         st.warning("No data found in sheet")
         st.stop()
@@ -959,7 +959,7 @@ df.columns = df.columns.str.strip()
 
 df["Date"] = pd.to_datetime(
     df["Date"], errors="coerce"
-).dt.date
+).dt.strftime("%Y-%m-%d")
 if not df.empty:
 
     # ========================================================
@@ -1169,7 +1169,7 @@ df.columns = df.columns.str.strip()
 
 df["Date"] = pd.to_datetime(
     df["Date"], errors="coerce"
-).dt.date
+).dt.strftime("%Y-%m-%d")
 # ✅ Check if data exists
 if df.empty:
     st.info("⚠ No attendance data found")
