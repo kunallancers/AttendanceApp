@@ -1025,41 +1025,6 @@ else:
 
     st.info("No attendance records found")
 
-# ============================================================
-# ✅ FILTER PANEL
-# ============================================================
-
-st.markdown("### 🔍 Filters")
-
-col1, col2 = st.columns(2)
-
-# Create Month column if missing
-if "Month" not in df.columns:
-    df["Month"] = pd.to_datetime(
-        df["Date"],
-        errors="coerce"
-    ).dt.strftime("%Y-%m")
-    
-# ============================================================
-# ✅ FILTER DATA
-# ============================================================
-
-col1, col2 = st.columns(2)
-
-# ✅ Month filter
-with col1:
-    month_list = sorted(df["Month"].dropna().unique(), reverse=True)
-
-    if not month_list:
-        st.info("No months available")
-        st.stop()
-
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        month_list,
-        key="month_filter_unique"
-    )
-
 # ✅ Employee filter
 with col2:
     employee_list = ["All"] + sorted(df["Employee"].dropna().astype(str).unique())
