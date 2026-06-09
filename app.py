@@ -1044,9 +1044,36 @@ with col2:
         key="employee_filter_unique"
     )
 
-# ✅ Cleaning fixes
-monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
-monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
+# ========================================================
+# ✅ FILTER DATA
+# ========================================================
+
+monthly_df = df[
+    df["Month"] == selected_month
+]
+
+# ✅ Employee filter
+if selected_employee != "All":
+
+    monthly_df = monthly_df[
+        monthly_df["Employee"] == selected_employee
+    ]
+
+# ============================================================
+# ✅ CLEANING FIXES
+# ============================================================
+
+monthly_df["Date"] = pd.to_datetime(
+    monthly_df["Date"],
+    errors="coerce"
+).dt.strftime("%Y-%m-%d")
+
+monthly_df["Logout"] = monthly_df[
+    "Logout"
+].replace("None", "Pending")
+# ============================================================
+# ✅ SUMMARY
+# ============================================================
 
 st.markdown("### 📊 Summary")
 
@@ -1054,63 +1081,82 @@ if not monthly_df.empty:
 
     total_records = len(monthly_df)
 
-    status_counts = monthly_df["Status"].astype(str).str.strip().value_counts()
+    status_counts = (
+        monthly_df["Status"]
+        .astype(str)
+        .str.strip()
+        .value_counts()
+    )
 
     full_days = status_counts.get("Full Day", 0)
+
     half_days = status_counts.get("Half Day", 0)
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("📋 Total Records", total_records)
+        st.metric(
+            "📋 Total Records",
+            total_records
+        )
 
     with col2:
-        st.metric("✅ Full Days", full_days)
+        st.metric(
+            "✅ Full Days",
+            full_days
+        )
 
     with col3:
-        st.metric("⏱ Half Days", half_days)
+        st.metric(
+            "⏱ Half Days",
+            half_days
+        )
 
 else:
-    st.info("⚠ No data available for selected filters")
+
+    st.info(
+        "⚠ No data available for selected filters"
+    )
+
 # ============================================================
 # ✅ DISPLAY RESULT
 # ============================================================
 
-
 def highlight_status(val):
+
     if val == "Full Day":
-        return "background-color: #d4edda; color: black"
+        return "background-color: #d4edda"
+
     elif val == "Half Day":
-        return "background-color: #fff3cd; color: black"
+        return "background-color: #fff3cd"
+
     elif val == "Absent":
-        return "background-color: #f8d7da; color: black"
+        return "background-color: #f8d7da"
+
     else:
         return ""
 
 # ============================================================
-# ✅ APPLY STYLING (SAFE VERSION)
+# ✅ APPLY STYLING
 # ============================================================
 
 if not monthly_df.empty:
 
-    def highlight_status(val):
-        if val == "Full Day":
-            return "background-color: #d4edda"
-        elif val == "Half Day":
-            return "background-color: #fff3cd"
-        elif val == "Absent":
-            return "background-color: #f8d7da"
-        else:
-            return ""
-
     styled_df = monthly_df.style.map(
-        highlight_status, subset=["Status"]
+        highlight_status,
+        subset=["Status"]
     )
 
-    st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(
+        styled_df,
+        use_container_width=True
+    )
 
 else:
-    st.info("⚠ No data available for selected filters")
+
+    st.info(
+        "⚠ No data available for selected filters"
+    )
 # ============================================================
 # ✅ MONTHLY ATTENDANCE REPORT (FINAL CLEAN VERSION)
 # ============================================================
