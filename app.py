@@ -1230,50 +1230,6 @@ with col2:
     )
 
 # ========================================================
-# ✅ FILTER DATA
-# ========================================================
-
-# ✅ Prepare Month List
-# ✅ Month List
-month_list = sorted(
-    df["Month"].dropna().unique(),
-    reverse=True
-)
-
-col1, col2 = st.columns(2)
-
-# ✅ Month Filter
-with col1:
-
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        month_list
-    )
-
-# ✅ Employee Filter
-with col2:
-
-    employee_list = ["All"] + sorted(
-        df["Employee"].dropna().unique()
-    )
-
-    selected_employee = st.selectbox(
-        "👤 Select Employee",
-        employee_list
-    )
-
-# ✅ Apply Filters
-monthly_df = df[
-    df["Month"] == selected_month
-]
-
-if selected_employee != "All":
-
-    monthly_df = monthly_df[
-        monthly_df["Employee"] == selected_employee
-    ]
-
-# ========================================================
 # ✅ APPLY FILTERS
 # ========================================================
 
@@ -1287,6 +1243,7 @@ if selected_employee != "All":
     monthly_df = monthly_df[
         monthly_df["Employee"] == selected_employee
     ]
+monthly_df = monthly_df.copy()
 
 # ✅ ✅ ADD YOUR FIXES HERE ✅
 monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
