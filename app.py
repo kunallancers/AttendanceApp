@@ -1222,12 +1222,6 @@ if selected_employee != "All":
         monthly_df["Employee"] == selected_employee
     ]
 
-# ✅ Apply search filter
-if search:
-    monthly_df = monthly_df[
-        monthly_df["Employee"].astype(str).str.contains(search, case=False, na=False)
-    ]
-
 # ✅ ✅ ADD YOUR FIXES HERE ✅
 monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
 monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
