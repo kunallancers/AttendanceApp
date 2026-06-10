@@ -432,7 +432,7 @@ with col1:
         ).dt.strftime("%Y-%m-%d")
 
         # ✅ Current Date & Time
-        date_str = date.today().strftime("%Y-%m-%d")
+        date_str = selected_date.strftime("%Y-%m-%d")
 
         login_time_str = get_ist().strftime("%H:%M:%S")
 
@@ -502,23 +502,24 @@ with col2:
 
         df.columns = df.columns.str.strip()
 
-        df["Date"] = pd.to_datetime(
-            df["Date"],
-            errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
+    df["Date"] = pd.to_datetime(
+        df["Date"],
+        errors="coerce"
+    ).dt.strftime("%Y-%m-%d")
 
-        today_date = date.today()
+# Convert today's date to the same format used in the DataFrame
+    today_date = date.today().strftime("%Y-%m-%d")
 
-        user_today = df[
-            (df["Date"] == today_date) &
-            (df["Employee"] == employee)
-        ]
+    user_today = df[
+        (df["Date"] == today_date) &
+        (df["Employee"] == employee)
+    ]
 
-        if user_today.empty:
+    if user_today.empty:
 
-            st.warning("⚠ No login record found")
+        st.warning("⚠ No login record found")
 
-            st.stop()
+        st.stop()
 
         last_index = user_today.index[-1]
 
@@ -764,7 +765,15 @@ if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
     df = df.sort_values(by=["Employee", "Date", "Login"])
 
     # ✅ Remove duplicates → keep last (latest login)
-    df_clean = df.groupby(["Employee", "Date"], as_index=False).last()
+    # Prefer completed records (those with Logout)
+    df_clean = (
+    df.sort_values(
+        by=["Employee", "Date", "Logout"],
+        na_position="first"
+    )
+    .groupby(["Employee", "Date"], as_index=False)
+    .last()
+)
 
     # ✅ Convert Login back to string
     df_clean["Login"] = df_clean["Login"].astype(str)
@@ -772,16 +781,10 @@ if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
     # ✅ Clear sheet
     sheet.clear()
 
-    # ✅ Re-add header (IMPORTANT)
-    sheet.append_row([
-        "Date","Employee","Login","Logout",
-        "Working Hours","Status","Type",
-        "Login Latitude","Login Longitude",
-        "Logout Latitude","Logout Longitude"
-    ])
-
     # ✅ Convert dataframe to list of lists
-    data_to_write = [df_clean.columns.tolist()] + df_clean.values.tolist()
+    data_to_write = [
+        df_clean.columns.tolist()
+    ] + df_clean.values.tolist()
 
     # ✅ Write entire sheet at once (VERY IMPORTANT)
     sheet.update("A1", data_to_write)
@@ -922,7 +925,11 @@ if role == "admin":
                         "",
                         "",
                         "Leave",
-                        "Leave"
+                        "Leave",
+                        "",
+                        "",
+                        "",
+                        ""
                     ])
 
                     st.success("✅ Leave Approved")
