@@ -502,113 +502,113 @@ with col2:
 
         df.columns = df.columns.str.strip()
 
-    df["Date"] = pd.to_datetime(
-        df["Date"],
-        errors="coerce"
-    ).dt.strftime("%Y-%m-%d")
+        df["Date"] = pd.to_datetime(
+            df["Date"],
+            errors="coerce"
+        ).dt.strftime("%Y-%m-%d")
 
-# Convert today's date to the same format used in the DataFrame
-    today_date = date.today().strftime("%Y-%m-%d")
-
-    user_today = df[
-        (df["Date"] == today_date) &
-        (df["Employee"] == employee)
-    ]
+        today_date = date.today().strftime("%Y-%m-%d")
+        st.write("Logged in employee:", employee)
+        st.write("Today's Date:", today_date)
+        st.write(df[["Date", "Employee", "Login"]].tail(10))
+        user_today = df[
+            (df["Date"] == today_date) &
+            (df["Employee"] == employee)
+        ]
 
     if user_today.empty:
-
         st.warning("⚠ No login record found")
-
         st.stop()
 
-        last_index = user_today.index[-1]
+# Continue normally
+    last_index = user_today.index[-1]
 
-        login_str = str(
-            user_today.iloc[-1]["Login"]
-        )
+login_str = str(
+    user_today.iloc[-1]["Login"]
+)
 
-        login_time = pd.to_datetime(
-            f"{today_date} {login_str}",
+login_time = pd.to_datetime(
+    f"{today_date} {login_str}",
             errors="coerce"
-        )
+)
 
-        logout_time = pd.to_datetime(
-            get_ist()
-        )
+logout_time = pd.to_datetime(
+    get_ist()
+)
 
-        if pd.isna(login_time):
+if pd.isna(login_time):
 
-            st.error("❌ Invalid login time")
+    st.error("❌ Invalid login time")
 
-            st.stop()
+    st.stop()
 
-        existing_logout = str(
-            user_today.iloc[-1]["Logout"]
-        ).strip()
+existing_logout = str(
+        user_today.iloc[-1]["Logout"]
+).strip()
 
-        if existing_logout not in ["", "nan", "None"]:
+if existing_logout not in ["", "nan", "None"]:
 
-            st.warning("⚠ Logout already completed")
+    st.warning("⚠ Logout already completed")
 
-            st.stop()
+    st.stop()
 
-        time_diff = logout_time - login_time
+time_diff = logout_time - login_time
 
-        working_hours = str(
-            time_diff
-        ).split(".")[0]
+working_hours = str(
+    time_diff
+).split(".")[0]
 
-        total_hours = (
-            time_diff.total_seconds() / 3600
-        )
+total_hours = (
+    time_diff.total_seconds() / 3600
+)
 
-        if total_hours >= 8:
+if total_hours >= 8:
 
-            status = "Full Day"
+    status = "Full Day"
 
-        elif total_hours >= 4:
+    elif total_hours >= 4:
 
-            status = "Half Day"
+status = "Half Day"
 
-        else:
+else:
 
-            status = "Short Day"
+status = "Short Day"
 
-        row_number = last_index + 2
+row_number = last_index + 2
 
-        sheet.update_cell(
+sheet.update_cell(
             row_number,
             4,
             logout_time.strftime("%H:%M:%S")
-        )
+)
 
-        sheet.update_cell(
+sheet.update_cell(
             row_number,
             5,
             working_hours
-        )
+)
 
-        sheet.update_cell(
+sheet.update_cell(
             row_number,
             6,
             status
-        )
+)
 
-        sheet.update_cell(
+sheet.update_cell(
             row_number,
             10,
             lat
-        )
+)
 
-        sheet.update_cell(
+sheet.update_cell(
             row_number,
             11,
             lon
-        )
+)
 
-        load_attendance.clear()
+load_attendance.clear()
 
-        st.success(
+st.success(
             f"""
 ✅ Logout Recorded Successfully
 
