@@ -1047,10 +1047,19 @@ with col2:
 # ========================================================
 # ✅ APPLY FILTERS
 # ========================================================
+months = ["All"] + sorted(df["Month"].dropna().unique())
 
-monthly_df = df[
-    df["Month"] == selected_month
-]
+selected_month = st.selectbox(
+    "Select Month",
+    months
+)
+
+monthly_df = df.copy()
+
+if selected_month != "All":
+    monthly_df = monthly_df[
+        monthly_df["Month"] == selected_month
+    ]
 
 # ✅ Employee filter
 if selected_employee != "All":
