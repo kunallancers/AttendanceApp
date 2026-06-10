@@ -1044,6 +1044,23 @@ with col2:
         key="employee_filter_unique"
     )
 
+# ========================================================
+# ✅ APPLY FILTERS
+# ========================================================
+
+monthly_df = df[
+    df["Month"] == selected_month
+]
+
+# ✅ Employee filter
+if selected_employee != "All":
+
+    monthly_df = monthly_df[
+        monthly_df["Employee"] == selected_employee
+    ]
+
+# ✅ Safe copy
+monthly_df = monthly_df.copy()
 # ============================================================
 # ✅ CLEANING FIXES
 # ============================================================
