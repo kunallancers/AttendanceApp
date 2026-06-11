@@ -83,59 +83,54 @@ def get_ist():
 
     return utc_now.astimezone(ist)
 
+
 # ============================================================
 # ✅ LOAD ATTENDANCE
 # ============================================================
-@st.cache_data(ttl=2)
+@st.cache_data(ttl=1)
 def load_attendance():
+    ...
+    return df
 
-    sheet, _ = connect_sheet()
-
-    data = sheet.get_all_records()
-
-    if not data:
-        return pd.DataFrame(columns=[
-            
-"Date",
-            "Employee",
-            "Login",
-            "Logout",
-            "Working Hours",
-            "Status",
-            "Type",
-            "Login Latitude",
-            "Login Longitude",
-            "Logout Latitude",
-            "Logout Longitude"
-        ])
-
-    return pd.DataFrame(data)
-
-df = load_attendance()
-df.columns = df.columns.str.strip()
-
-df["Date"] = pd.to_datetime(
-    df["Date"], errors="coerce"
-).dt.strftime("%Y-%m-%d")
 
 # ============================================================
-# ✅ LOAD LEAVE
+# ✅ LOAD LEAVE (SAFE VERSION ✅ PLACE HERE)
 # ============================================================
 def load_leave():
 
-    _, leave_sheet = connect_sheet()
+    try:
+        _, leave_sheet = connect_sheet()
 
-    data = leave_sheet.get_all_records()
+        data = leave_sheet.get_all_records()
 
-    if not data:
-        return pd.DataFrame(columns=[
-            "Employee",
-            "Date",
-            "Reason",
-            "Status"
-        ])
+        if not data:
+            return pd.DataFrame(columns=[
+                "Employee",
+                "Date",
+                "Reason",
+                "Status"
+            ])
 
-    return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+        df.columns = df.columns.str.strip()
+
+        # ✅ Normalize employee name
+        if "Employee" in df.columns:
+            df["Employee"] = (
+                df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
+
+        return df
+
+    except Exception as e:
+        st.error(f"❌ Error loading leave: {e}")
+        return pd.DataFrame()
+
+# ✅ ALWAYS LOAD FRESH DATA AFTER CALL
+df = load_attendance()
 
 # ============================================================
 # ✅ SESSION STATE
@@ -700,6 +695,8 @@ st.subheader("📩 Leave Management")
 
 leave_df = load_leave()
 
+employee_clean = str(employee).strip().upper()
+
 # ============================================================
 # ✅ EMPLOYEE LEAVE
 # ============================================================
@@ -773,7 +770,7 @@ if role == "employee":
     leave_df = load_leave()
 
     st.dataframe(
-        leave_df[leave_df["Employee"] == employee]
+        leave_df[leave_df["Employee"] == employee_clean]
     )
 
 # ============================================================
