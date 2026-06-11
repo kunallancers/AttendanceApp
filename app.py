@@ -434,7 +434,11 @@ with col2:
     if st.button("🔴 Logout Attendance"):
 
         lat, lon = get_location_values()
+        
+        
         sheet, _ = connect_sheet()
+        
+        st.write("Sheet connected:", sheet is not None)
 
         df = load_attendance()
         df.columns = df.columns.str.strip()
