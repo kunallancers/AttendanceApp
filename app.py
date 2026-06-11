@@ -482,6 +482,7 @@ with col2:
 
         time_diff = logout_time - login_time
         working_hours = str(time_diff).split(".")[0]
+        
         total_hours = time_diff.total_seconds() / 3600
 
         if total_hours >= 8:
@@ -494,13 +495,14 @@ with col2:
             status = "Short Day"
 
         row_number = last_index + 2
-        
+
     try:
         sheet.update_cell(row_number, 4, logout_time.strftime("%H:%M:%S"))
         sheet.update_cell(row_number, 5, working_hours)
         sheet.update_cell(row_number, 6, status)
         sheet.update_cell(row_number, 10, lat)
         sheet.update_cell(row_number, 11, lon)
+    
     except Exception as e:
         st.error(f"❌ Sheet update failed: {e}")
         st.stop()
