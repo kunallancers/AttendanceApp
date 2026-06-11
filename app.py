@@ -494,7 +494,8 @@ with col2:
             status = "Short Day"
 
         row_number = last_index + 2
-
+        
+    try:
         sheet.update_cell(row_number, 4, logout_time.strftime("%H:%M:%S"))
         sheet.update_cell(row_number, 5, working_hours)
         sheet.update_cell(row_number, 6, status)
