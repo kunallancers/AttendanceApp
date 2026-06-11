@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit_geolocation import streamlit_geolocation
 import streamlit.components.v1 as components
-
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -9,43 +8,24 @@ from datetime import datetime, date, timezone
 import pytz
 import os
 import time
+
+# ============================================================
+# ✅ PAGE CONFIG (MUST BE FIRST STREAMLIT COMMAND)
+# ============================================================
+
+st.set_page_config(
+    page_title="Attendance Management System",
+    layout="wide"
+)
 # ============================================================
 # ✅ APP STYLING (BACKGROUND + UI)
 # ============================================================
 
-st.markdown("""
-<style>
-    /* Main background */
-    .stApp {
-        background-color: #F4F6F7;
-    }
+from datetime import datetime, date, timezone
+import pytz
+import os
+import time
 
-    /* Remove padding for top header */
-    .block-container {
-        padding-top: 2rem;
-    }
-
-    /* Style buttons */
-    .stButton > button {
-        background-color: #2E86C1;
-        color: white;
-        border-radius: 8px;
-        padding: 0.5em 1em;
-        border: none;
-    }
-
-    /* Hover effect */
-    .stButton > button:hover {
-        background-color: #1B4F72;
-    }
-
-    /* Selectbox styling */
-    .stSelectbox div {
-        border-radius: 8px;
-    }
-
-</style>
-""", unsafe_allow_html=True)
 # ✅ Auto refresh every 5 seconds
 if "last_refresh" not in st.session_state:
     st.session_state["last_refresh"] = time.time()
@@ -56,41 +36,10 @@ if current_time - st.session_state["last_refresh"] > 5:
     st.session_state["last_refresh"] = current_time
     st.rerun()
 
-# ✅ Function to fetch location
-def get_location():
-    location_js = """
-    <script>
-    function sendLocation() {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                const data = lat + "," + lon;
-                window.parent.postMessage(data, "*");
-            }
-        );
-    }
-    sendLocation();
-    </script>
-    """
-
-    components.html(location_js, height=0)
-    
-# ✅ Save location
-
-# ============================================================
-# ✅ PAGE CONFIG
-# ============================================================
-st.set_page_config(
-    page_title="Attendance Management System",
-    layout="wide"
-)
-
 # ============================================================
 # ✅ GOOGLE SHEET CONNECTION (FINAL STABLE VERSION)
 # ============================================================
 
-import streamlit as st
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 
@@ -278,15 +227,6 @@ employee = st.session_state["employee"]
 
 # ✅ ADD THIS
 ADMIN_USERS = ["ADMIN"]
-
-# ============================================================
-# ✅ HEADER + LOCATION (FINAL CLEAN STRUCTURE)
-# ============================================================
-
-st.markdown("""
-<h1 style='text-align: center; color: #2E86C1;'>📊 Attendance Management Dashboard</h1>
-<hr>
-""", unsafe_allow_html=True)
 
 st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
 
@@ -491,15 +431,12 @@ with col1:
 # ============================================================
 
 with col2:
-
     if st.button("🔴 Logout Attendance"):
 
         lat, lon = get_location_values()
-
         sheet, _ = connect_sheet()
 
         df = load_attendance()
-
         df.columns = df.columns.str.strip()
 
         df["Date"] = pd.to_datetime(
@@ -507,18 +444,17 @@ with col2:
             errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-        today_date = date.today().strftime("%Y-%m-%d")
-        st.write("Logged in employee:", employee)
-        st.write("Today's Date:", today_date)
-        st.write(df[["Date", "Employee", "Login"]].tail(10))
+        # ✅ FIXED
+        today_date = selected_date.strftime("%Y-%m-%d")
+
         user_today = df[
             (df["Date"] == today_date) &
             (df["Employee"] == employee)
         ]
 
-    if user_today.empty:
-        st.warning("⚠ No login record found")
-        st.stop()
+        if user_today.empty:
+            st.warning("⚠ No login record found")
+            st.stop()
 
 # Continue normally
     last_index = user_today.index[-1]
@@ -563,16 +499,13 @@ total_hours = (
 )
 
 if total_hours >= 8:
-
     status = "Full Day"
 
-    elif total_hours >= 4:
-
-status = "Half Day"
+elif total_hours >= 4:
+    status = "Half Day"
 
 else:
-
-status = "Short Day"
+    status = "Short Day"
 
 row_number = last_index + 2
 
@@ -620,7 +553,7 @@ st.success(
 """
         )
 
-        st.rerun()
+st.rerun()
 
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
@@ -1038,42 +971,41 @@ if "Working Hours" in df.columns:
     df["Working Hours"] = df["Working Hours"].astype(str)
 
 else:
-
     st.info("No attendance records found")
 
-# ✅ Employee filter
+
+# ✅ Employee filter with col2:
+employee_list = ["All"] + sorted(df["Employee"].dropna().astype(str).unique())
+
+selected_employee = st.selectbox(
+    "👤 Select Employee",
+    employee_list,
+    key="employee_filter_unique"
+)
+
+# ========================================================
+# ✅ FILTERS (FIXED ALIGNMENT)
+# ========================================================
+
+col1, col2 = st.columns(2)
+
+with col1:
+    months = ["All"] + sorted(df["Month"].dropna().unique())
+    selected_month = st.selectbox(
+        "📅 Select Month",
+        months
+    )
+
 with col2:
-    employee_list = ["All"] + sorted(df["Employee"].dropna().astype(str).unique())
+    employee_list = ["All"] + sorted(
+        df["Employee"].dropna().astype(str).unique()
+    )
 
     selected_employee = st.selectbox(
         "👤 Select Employee",
         employee_list,
         key="employee_filter_unique"
     )
-
-# ========================================================
-# ✅ APPLY FILTERS
-# ========================================================
-months = ["All"] + sorted(df["Month"].dropna().unique())
-
-selected_month = st.selectbox(
-    "Select Month",
-    months
-)
-
-monthly_df = df.copy()
-
-if selected_month != "All":
-    monthly_df = monthly_df[
-        monthly_df["Month"] == selected_month
-    ]
-
-# ✅ Employee filter
-if selected_employee != "All":
-
-    monthly_df = monthly_df[
-        monthly_df["Employee"] == selected_employee
-    ]
 
 # ✅ Safe copy
 monthly_df = monthly_df.copy()
