@@ -457,103 +457,64 @@ with col2:
             st.stop()
 
 # Continue normally
-    last_index = user_today.index[-1]
+        last_index = user_today.index[-1]
 
-login_str = str(
-    user_today.iloc[-1]["Login"]
-)
+        login_str = str(user_today.iloc[-1]["Login"])
 
-login_time = pd.to_datetime(
-    f"{today_date} {login_str}",
+        login_time = pd.to_datetime(
+            f"{today_date} {login_str}",
             errors="coerce"
-)
+        )
 
-logout_time = pd.to_datetime(
-    get_ist()
-)
+        logout_time = pd.to_datetime(get_ist())
 
-if pd.isna(login_time):
+        if pd.isna(login_time):
+            st.error("❌ Invalid login time")
+            st.stop()
 
-    st.error("❌ Invalid login time")
+        existing_logout = str(
+            user_today.iloc[-1]["Logout"]
+        ).strip()
 
-    st.stop()
+        if existing_logout not in ["", "nan", "None"]:
+            st.warning("⚠ Logout already completed")
+            st.stop()
 
-existing_logout = str(
-        user_today.iloc[-1]["Logout"]
-).strip()
+        time_diff = logout_time - login_time
+        working_hours = str(time_diff).split(".")[0]
+        total_hours = time_diff.total_seconds() / 3600
 
-if existing_logout not in ["", "nan", "None"]:
+        if total_hours >= 8:
+            status = "Full Day"
 
-    st.warning("⚠ Logout already completed")
+        elif total_hours >= 4:
+            status = "Half Day"
 
-    st.stop()
+        else:
+            status = "Short Day"
 
-time_diff = logout_time - login_time
+        row_number = last_index + 2
 
-working_hours = str(
-    time_diff
-).split(".")[0]
+        sheet.update_cell(row_number, 4, logout_time.strftime("%H:%M:%S"))
+        sheet.update_cell(row_number, 5, working_hours)
+        sheet.update_cell(row_number, 6, status)
+        sheet.update_cell(row_number, 10, lat)
+        sheet.update_cell(row_number, 11, lon)
+    except Exception as e:
+        st.error(f"❌ Sheet update failed: {e}")
+        st.stop()
 
-total_hours = (
-    time_diff.total_seconds() / 3600
-)
-
-if total_hours >= 8:
-    status = "Full Day"
-
-elif total_hours >= 4:
-    status = "Half Day"
-
-else:
-    status = "Short Day"
-
-row_number = last_index + 2
-
-sheet.update_cell(
-            row_number,
-            4,
-            logout_time.strftime("%H:%M:%S")
-)
-
-sheet.update_cell(
-            row_number,
-            5,
-            working_hours
-)
-
-sheet.update_cell(
-            row_number,
-            6,
-            status
-)
-
-sheet.update_cell(
-            row_number,
-            10,
-            lat
-)
-
-sheet.update_cell(
-            row_number,
-            11,
-            lon
-)
-
-load_attendance.clear()
-
-st.success(
-            f"""
-✅ Logout Recorded Successfully
-
-📍 Logout Location: {lat}, {lon}
-
-⏱ Working Hours: {working_hours}
-
+        load_attendance.clear()
+        
+        st.success(
+            f"""✅ Logout Recorded Successfully
+📍 Location: {lat}, {lon}
+⏱ Hours: {working_hours}
 📌 Status: {status}
 """
         )
 
-st.rerun()
+        st.rerun()
 
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
