@@ -404,7 +404,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
 
     if st.button("🟢 Login Attendance", key="login_att_btn"):
-
+        st.success("✅ Login button clicked")
         # ✅ CURRENT TIME
         login_time_str = get_ist().strftime("%H:%M:%S")
 
@@ -476,6 +476,7 @@ with col1:
                 "",
                 ""
             ])
+            st.success("✅ Row inserted into sheet")
         except Exception as e:
             st.error(f"❌ Login failed: {e}")
             st.stop()
