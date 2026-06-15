@@ -398,81 +398,98 @@ attendance_type = st.selectbox(
 col1, col2, col3 = st.columns(3)
 
 # ============================================================
-# ✅ LOGIN ATTENDANCE
+# ✅ LOGIN ATTENDANCE (FINAL CLEAN VERSION ✅)
 # ============================================================
 
 with col1:
 
     if st.button("🟢 Login Attendance", key="login_att_btn"):
 
-        lat, lon = get_location_values()
-
-        sheet, _ = connect_sheet()
-
-        # ✅ Load latest attendance
-        df = load_attendance()
-
-        # ✅ Clean dataframe
-        df.columns = df.columns.str.strip()
-
-        # ✅ Normalize Date
-        df["Date"] = pd.to_datetime(
-            df["Date"],
-            errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
-
-        # ✅ Current Date & Time
-        date_str = selected_date.strftime("%Y-%m-%d")
-
+        # ✅ CURRENT TIME
         login_time_str = get_ist().strftime("%H:%M:%S")
 
-        # ====================================================
-        # ✅ CHECK EXISTING LOGIN
-        # ====================================================
+        # ✅ DATE
+        date_str = selected_date.strftime("%Y-%m-%d")
 
+        # ✅ LOCATION
+        lat, lon = get_location_values()
+        if lat is None:
+            lat = "NA"
+        if lon is None:
+            lon = "NA"
+
+        # ✅ CONNECT SHEET
+        sheet, _ = connect_sheet()
+
+        # ✅ LOAD LATEST DATA
+        load_attendance.clear()
+        df = load_attendance()
+
+        
+        # ✅ CLEAN DATA (SAFE)
+        if df.empty:
+            df = pd.DataFrame(columns=["Date", "Employee", "Logout"])
+        
+        df.columns = df.columns.str.strip()
+
+
+        # ✅ NORMALIZE EMPLOYEE
+        employee_clean = str(employee).strip().upper()
+
+        if "Employee" in df.columns:
+            df["Employee"] = (
+                df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
+
+        # ====================================================
+        # ✅ PREVENT DUPLICATE LOGIN
+        # ====================================================
         existing_today = df[
             (df["Date"] == date_str) &
-            (df["Employee"] == employee)
+            (df["Employee"] == employee_clean)
         ]
 
-        # ✅ Prevent duplicate only if logout pending
         if not existing_today.empty:
-
-            last_logout = str(
-                existing_today.iloc[-1]["Logout"]
-            ).strip()
+            last_logout = str(existing_today.iloc[-1]["Logout"]).strip()
 
             if last_logout in ["", "nan", "None"]:
-
                 st.warning("⚠ Already logged in today")
-
                 st.stop()
 
         # ====================================================
-        # ✅ SAVE LOGIN
+        # ✅ SAVE LOGIN (CORRECT ORDER ✅)
         # ====================================================
-        
-        sheet.append_row([
-            employee,        # ✅ FIRST
-            date_str,        # ✅ SECOND
-            login_time_str,
-            "",
-            "",
-            "In Progress",
-            attendance_type,
-            lat,
-            lon,
-            "",
-            ""
-        ])
+        try:
+            sheet.append_row([
+                employee,
+                date_str,
+                login_time_str,
+                "",
+                "",
+                "In Progress",
+                attendance_type,
+                lat,
+                lon,
+                "",
+                ""
+            ])
+        except Exception as e:
+            st.error(f"❌ Login failed: {e}")
+            st.stop()
 
-        # ✅ Clear cache
-        
+        # ✅ CLEAR CACHE
+        load_attendance.clear()
+
+        # ✅ SUCCESS MESSAGE
         st.success(
-            f"✅ Login Recorded Successfully 📍 {lat}, {lon}"
+            f"✅ Login Recorded Successfully\n"
+            f"⏰ {login_time_str} | 📍 {lat}, {lon}"
         )
 
-        # ✅ Refresh immediately
+        # ✅ REFRESH UI
         st.rerun()
 
 # ============================================================
