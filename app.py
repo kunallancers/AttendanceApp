@@ -27,14 +27,14 @@ import os
 import time
 
 # ✅ Auto refresh every 5 seconds
-if "last_refresh" not in st.session_state:
-    st.session_state["last_refresh"] = time.time()
+# if "last_refresh" not in st.session_state:
+#     st.session_state["last_refresh"] = time.time()
 
-current_time = time.time()
+# current_time = time.time()
 
-if current_time - st.session_state["last_refresh"] > 5:
-    st.session_state["last_refresh"] = current_time
-    st.rerun()
+# if current_time - st.session_state["last_refresh"] > 5:
+#     st.session_state["last_refresh"] = current_time
+#     st.rerun()
 
 # ============================================================
 # ✅ GOOGLE SHEET CONNECTION (FINAL STABLE VERSION)
@@ -87,10 +87,48 @@ def get_ist():
 # ============================================================
 # ✅ LOAD ATTENDANCE
 # ============================================================
-@st.cache_data(ttl=1)
 def load_attendance():
-    ...
-    return df
+
+    try:
+        sheet, _ = connect_sheet()
+
+        data = sheet.get_all_records()
+
+        if not data:
+            return pd.DataFrame(columns=[
+                "Date",
+                "Employee",
+                "Login",
+                "Logout",
+                "Working Hours",
+                "Status",
+                "Type",
+                "Login Latitude",
+                "Login Longitude",
+                "Logout Latitude",
+                "Logout Longitude"
+            ])
+
+        df = pd.DataFrame(data)
+        df.columns = df.columns.str.strip()
+
+        return df
+
+    except Exception as e:
+        st.error(f"❌ Error loading attendance: {e}")
+        return pd.DataFrame(columns=[
+            "Date",
+            "Employee",
+            "Login",
+            "Logout",
+            "Working Hours",
+            "Status",
+            "Type",
+            "Login Latitude",
+            "Login Longitude",
+            "Logout Latitude",
+            "Logout Longitude"
+        ])
 
 
 # ============================================================
@@ -412,7 +450,7 @@ with col1:
         ])
 
         # ✅ Clear cache
-        load_attendance.clear()
+        
 
         st.success(
             f"✅ Login Recorded Successfully 📍 {lat}, {lon}"
@@ -429,10 +467,9 @@ with col2:
     if st.button("🔴 Logout Attendance"):
 
         lat, lon = get_location_values()
-        
-        
+
         sheet, _ = connect_sheet()
-        
+
         st.write("Sheet connected:", sheet is not None)
 
         df = load_attendance()
@@ -443,7 +480,6 @@ with col2:
             errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
-        # ✅ FIXED
         today_date = selected_date.strftime("%Y-%m-%d")
 
         user_today = df[
@@ -455,7 +491,6 @@ with col2:
             st.warning("⚠ No login record found")
             st.stop()
 
-# Continue normally
         last_index = user_today.index[-1]
 
         login_str = str(user_today.iloc[-1]["Login"])
@@ -481,7 +516,7 @@ with col2:
 
         time_diff = logout_time - login_time
         working_hours = str(time_diff).split(".")[0]
-        
+
         total_hours = time_diff.total_seconds() / 3600
 
         if total_hours >= 8:
@@ -495,28 +530,26 @@ with col2:
 
         row_number = last_index + 2
 
-    try:
-        sheet.update_cell(row_number, 4, logout_time.strftime("%H:%M:%S"))
-        sheet.update_cell(row_number, 5, working_hours)
-        sheet.update_cell(row_number, 6, status)
-        sheet.update_cell(row_number, 10, lat)
-        sheet.update_cell(row_number, 11, lon)
-    
-    except Exception as e:
-        st.error(f"❌ Sheet update failed: {e}")
-        st.stop()
+        try:
+            sheet.update_cell(row_number, 4, logout_time.strftime("%H:%M:%S"))
+            sheet.update_cell(row_number, 5, working_hours)
+            sheet.update_cell(row_number, 6, status)
+            sheet.update_cell(row_number, 10, lat)
+            sheet.update_cell(row_number, 11, lon)
 
-        load_attendance.clear()
-        
-        st.success(
-            f"""✅ Logout Recorded Successfully
+            st.success(
+                f"""✅ Logout Recorded Successfully
 📍 Location: {lat}, {lon}
 ⏱ Hours: {working_hours}
 📌 Status: {status}
 """
-        )
+            )
 
-        st.rerun()
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"❌ Sheet update failed: {e}")
+            st.stop()
 
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
@@ -534,7 +567,9 @@ df_today["Date"] = pd.to_datetime(
 ).dt.strftime("%Y-%m-%d")
 
 today_date = date.today().strftime("%Y-%m-%d")
-
+df_today = load_attendance()
+st.write("Rows loaded:", len(df_today))
+st.dataframe(df_today)
 if role == "admin":
 
     today_data = df_today[
@@ -627,7 +662,7 @@ if role == "admin":
                 ])
 
                 # ✅ CLEAR CACHE
-                load_attendance.clear()
+                
 
                 st.success("✅ Attendance Cleared Successfully")
 
@@ -685,7 +720,7 @@ if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
     # ✅ Write entire sheet at once (VERY IMPORTANT)
     sheet.update("A1", data_to_write)
     
-    load_attendance.clear()
+    
 
     st.success("✅ Duplicate entries removed successfully")
 # ============================================================
@@ -945,7 +980,7 @@ employee_list = ["All"] + sorted(df["Employee"].dropna().astype(str).unique())
 selected_employee = st.selectbox(
     "👤 Select Employee",
     employee_list,
-    key="employee_filter_unique"
+    key="employee_filter_top"
 )
 
 # ========================================================
@@ -969,114 +1004,8 @@ with col2:
     selected_employee = st.selectbox(
         "👤 Select Employee",
         employee_list,
-        key="employee_filter_unique"
+        key="employee_filter_bottom"
     )
-
-# ✅ Safe copy
-monthly_df = monthly_df.copy()
-# ============================================================
-# ✅ CLEANING FIXES
-# ============================================================
-
-monthly_df["Date"] = pd.to_datetime(
-    monthly_df["Date"],
-    errors="coerce"
-).dt.strftime("%Y-%m-%d")
-
-monthly_df["Logout"] = monthly_df[
-    "Logout"
-].replace("None", "Pending")
-# ============================================================
-# ✅ SUMMARY
-# ============================================================
-
-st.markdown("### 📊 Summary")
-
-if not monthly_df.empty:
-
-    total_records = len(monthly_df)
-
-    status_counts = (
-        monthly_df["Status"]
-        .astype(str)
-        .str.strip()
-        .value_counts()
-    )
-
-    full_days = status_counts.get("Full Day", 0)
-
-    half_days = status_counts.get("Half Day", 0)
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            "📋 Total Records",
-            total_records
-        )
-
-    with col2:
-        st.metric(
-            "✅ Full Days",
-            full_days
-        )
-
-    with col3:
-        st.metric(
-            "⏱ Half Days",
-            half_days
-        )
-
-else:
-
-    st.info(
-        "⚠ No data available for selected filters"
-    )
-
-# ============================================================
-# ✅ DISPLAY RESULT
-# ============================================================
-
-def highlight_status(val):
-
-    if val == "Full Day":
-        return "background-color: #d4edda"
-
-    elif val == "Half Day":
-        return "background-color: #fff3cd"
-
-    elif val == "Absent":
-        return "background-color: #f8d7da"
-
-    else:
-        return ""
-
-# ============================================================
-# ✅ APPLY STYLING
-# ============================================================
-
-if not monthly_df.empty:
-
-    styled_df = monthly_df.style.map(
-        highlight_status,
-        subset=["Status"]
-    )
-
-    st.dataframe(
-        styled_df,
-        use_container_width=True
-    )
-
-else:
-
-    st.info(
-        "⚠ No data available for selected filters"
-    )
-# ============================================================
-# ✅ MONTHLY ATTENDANCE REPORT (FINAL CLEAN VERSION)
-# ============================================================
-
-st.subheader("📅 Monthly Attendance Report")
 
 # ✅ Load data (IMPORTANT ✅)
 df = load_attendance()
