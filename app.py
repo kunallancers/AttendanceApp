@@ -85,15 +85,20 @@ def get_ist():
 
 
 # ============================================================
-# ✅ LOAD ATTENDANCE
+# ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
 # ============================================================
+
+@st.cache_data(ttl=1)
 def load_attendance():
+
+    df = pd.DataFrame()   # ✅ ALWAYS DEFINE FIRST (CRITICAL FIX)
 
     try:
         sheet, _ = connect_sheet()
 
         data = sheet.get_all_records()
 
+        # ✅ EMPTY SHEET
         if not data:
             return pd.DataFrame(columns=[
                 "Date",
@@ -109,28 +114,40 @@ def load_attendance():
                 "Logout Longitude"
             ])
 
+        # ✅ CREATE DF
         df = pd.DataFrame(data)
+
+        # ✅ CLEAN COLUMNS
         df.columns = df.columns.str.strip()
 
-        return df
+        # ✅ CHECK REQUIRED COLUMN
+        if "Date" not in df.columns:
+            st.error("❌ 'Date' column missing in sheet")
+            return pd.DataFrame()
+
+        # ✅ CLEAN DATA
+        df["Date"] = pd.to_datetime(
+            df["Date"], errors="coerce"
+        )
+
+        df = df.dropna(subset=["Date"])
+
+        df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
+
+        # ✅ CLEAN EMPLOYEE
+        if "Employee" in df.columns:
+            df["Employee"] = (
+                df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
+
+        return df   # ✅ ALWAYS SAFE
 
     except Exception as e:
         st.error(f"❌ Error loading attendance: {e}")
-        return pd.DataFrame(columns=[
-            "Date",
-            "Employee",
-            "Login",
-            "Logout",
-            "Working Hours",
-            "Status",
-            "Type",
-            "Login Latitude",
-            "Login Longitude",
-            "Logout Latitude",
-            "Logout Longitude"
-        ])
-
-
+        return df   # ✅ RETURN SAFE EMPTY DF (FIX)
 # ============================================================
 # ✅ LOAD LEAVE (SAFE VERSION ✅ PLACE HERE)
 # ============================================================
@@ -434,10 +451,10 @@ with col1:
         # ====================================================
         # ✅ SAVE LOGIN
         # ====================================================
-
+        
         sheet.append_row([
-            date_str,
-            employee,
+            employee,        # ✅ FIRST
+            date_str,        # ✅ SECOND
             login_time_str,
             "",
             "",
@@ -451,7 +468,6 @@ with col1:
 
         # ✅ Clear cache
         
-
         st.success(
             f"✅ Login Recorded Successfully 📍 {lat}, {lon}"
         )
