@@ -464,8 +464,8 @@ with col1:
         # ====================================================
         try:
             sheet.append_row([
-                employee,
                 date_str,
+                employee,
                 login_time_str,
                 "",
                 "",
@@ -548,43 +548,55 @@ with col2:
             st.warning("⚠ Logout already completed")
             st.stop()
 
-        time_diff = logout_time - login_time
-        working_hours = str(time_diff).split(".")[0]
+login_time = pd.to_datetime(login_time, errors="coerce")
+logout_time = pd.to_datetime(logout_time, errors="coerce")
 
-        total_hours = time_diff.total_seconds() / 3600
+time_diff = pd.Timedelta(0)
+working_hours = "00:00:00"
+total_hours = 0
+status = "Short Day"
 
-        if total_hours >= 8:
-            status = "Full Day"
+if pd.notna(login_time) and pd.notna(logout_time):
 
-        elif total_hours >= 4:
-            status = "Half Day"
+    if logout_time < login_time:
+        logout_time += pd.Timedelta(days=1)
 
-        else:
-            status = "Short Day"
+    time_diff = logout_time - login_time
 
-        row_number = last_index + 2
+    total_hours = time_diff.total_seconds() / 3600
 
-        try:
-            sheet.update_cell(row_number, 4, logout_time.strftime("%H:%M:%S"))
-            sheet.update_cell(row_number, 5, working_hours)
-            sheet.update_cell(row_number, 6, status)
-            sheet.update_cell(row_number, 10, lat)
-            sheet.update_cell(row_number, 11, lon)
+    # Display value as HH:MM:SS
+    working_hours = str(time_diff).split(".")[0]
 
-            st.success(
-                f"""✅ Logout Recorded Successfully
+    if total_hours >= 8:
+        status = "Full Day"
+    elif total_hours >= 4:
+        status = "Half Day"
+    else:
+        status = "Short Day"
+
+row_number = last_index + 2
+
+try:
+    sheet.update_cell(row_number, 4, logout_time.strftime("%H:%M:%S"))
+    sheet.update_cell(row_number, 5, working_hours)
+    sheet.update_cell(row_number, 6, status)
+    sheet.update_cell(row_number, 10, lat)
+    sheet.update_cell(row_number, 11, lon)
+
+    st.success(
+        f"""✅ Logout Recorded Successfully
 📍 Location: {lat}, {lon}
 ⏱ Hours: {working_hours}
 📌 Status: {status}
 """
-            )
+    )
 
-            st.rerun()
+    st.rerun()
 
-        except Exception as e:
-            st.error(f"❌ Sheet update failed: {e}")
-            st.stop()
-
+except Exception as e:
+    st.error(f"❌ Sheet update failed: {e}")
+    st.stop()
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
 # ============================================================
