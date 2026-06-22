@@ -644,26 +644,6 @@ with col2:
             st.stop()
 
 # ===========================
-# DEBUG INFORMATION
-# ===========================
-
-st.write("🔍 DEBUG - Login Time:", login_time)
-st.write("🔍 DEBUG - Logout Time:", logout_time)
-
-st.write("🔍 DEBUG - Login Type:", type(login_time))
-st.write("🔍 DEBUG - Logout Type:", type(logout_time))
-
-try:
-    st.write("🔍 DEBUG - Login TZ:", login_time.tzinfo)
-except Exception:
-    st.write("🔍 DEBUG - Login TZ: None")
-
-try:
-    st.write("🔍 DEBUG - Logout TZ:", logout_time.tzinfo)
-except Exception:
-    st.write("🔍 DEBUG - Logout TZ: None")
-
-# ===========================
 # REMOVE TIMEZONE DIFFERENCES
 # ===========================
 
