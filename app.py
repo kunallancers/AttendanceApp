@@ -75,15 +75,11 @@ def connect_sheet():
 # ============================================================
 # ✅ IST TIME
 # ============================================================
+
 def get_ist():
-
-    utc_now = datetime.now(timezone.utc)
-
-    ist = pytz.timezone("Asia/Kolkata")
-
-    return utc_now.astimezone(ist)
-
-
+    return pd.Timestamp.now(
+        tz="Asia/Kolkata"
+    ).tz_localize(None)
 # ============================================================
 # ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
 # ============================================================
@@ -555,72 +551,132 @@ with col2:
 
         # ✅ Calculate working hours safely
 
-        if pd.isna(logout_time):
-            st.error("❌ Invalid logout time")
-            st.stop()
+if pd.isna(login_time):
+    st.error("❌ Invalid login time")
+    st.stop()
 
-        if logout_time < login_time:
-            logout_time += pd.Timedelta(days=1)
+if pd.isna(logout_time):
+    st.error("❌ Invalid logout time")
+    st.stop()
 
-        time_diff = logout_time - login_time
+# ===========================
+# DEBUG INFORMATION
+# ===========================
 
-        total_hours = time_diff.total_seconds() / 3600
+st.write("🔍 DEBUG - Login Time:", login_time)
+st.write("🔍 DEBUG - Logout Time:", logout_time)
 
-        working_hours = str(time_diff).split(".")[0]
+st.write("🔍 DEBUG - Login Type:", type(login_time))
+st.write("🔍 DEBUG - Logout Type:", type(logout_time))
 
-        if total_hours >= 8:
-            status = "Full Day"
-        elif total_hours >= 4:
-            status = "Half Day"
-        else:
-            status = "Short Day"
+try:
+    st.write("🔍 DEBUG - Login TZ:", login_time.tzinfo)
+except Exception:
+    st.write("🔍 DEBUG - Login TZ: None")
 
-        row_number = last_index + 2
+try:
+    st.write("🔍 DEBUG - Logout TZ:", logout_time.tzinfo)
+except Exception:
+    st.write("🔍 DEBUG - Logout TZ: None")
 
-        try:
-            sheet.update_cell(
-                row_number,
-                4,
-                logout_time.strftime("%H:%M:%S")
-            )
+# ===========================
+# REMOVE TIMEZONE DIFFERENCES
+# ===========================
 
-            sheet.update_cell(
-                row_number,
-                5,
-                working_hours
-            )
+try:
+    if login_time.tzinfo is not None:
+        login_time = login_time.tz_localize(None)
+except Exception as e:
+    st.write("Login tz_localize issue:", e)
 
-            sheet.update_cell(
-                row_number,
-                6,
-                status
-            )
+try:
+    if logout_time.tzinfo is not None:
+        logout_time = logout_time.tz_localize(None)
+except Exception as e:
+    st.write("Logout tz_localize issue:", e)
 
-            sheet.update_cell(
-                row_number,
-                10,
-                lat
-            )
+st.write("🔍 DEBUG - Login After Cleanup:", login_time)
+st.write("🔍 DEBUG - Logout After Cleanup:", logout_time)
 
-            sheet.update_cell(
-                row_number,
-                11,
-                lon
-            )
+# ===========================
+# CALCULATE HOURS
+# ===========================
 
-            st.success(
-                f"""✅ Logout Recorded Successfully
+try:
+
+    if logout_time < login_time:
+        logout_time += pd.Timedelta(days=1)
+
+    time_diff = logout_time - login_time
+
+    total_hours = time_diff.total_seconds() / 3600
+
+    working_hours = str(time_diff).split(".")[0]
+
+    if total_hours >= 8:
+        status = "Full Day"
+    elif total_hours >= 4:
+        status = "Half Day"
+    else:
+        status = "Short Day"
+
+except Exception as e:
+    st.error(f"❌ Time calculation error: {e}")
+
+    st.write("Login Time:", login_time)
+    st.write("Logout Time:", logout_time)
+
+    st.write("Login Type:", type(login_time))
+    st.write("Logout Type:", type(logout_time))
+
+    st.stop()
+
+row_number = last_index + 2
+
+try:
+    sheet.update_cell(
+        row_number,
+        4,
+        logout_time.strftime("%H:%M:%S")
+    )
+
+    sheet.update_cell(
+        row_number,
+        5,
+        working_hours
+    )
+
+    sheet.update_cell(
+        row_number,
+        6,
+        status
+    )
+
+    sheet.update_cell(
+        row_number,
+        10,
+        lat
+    )
+
+    sheet.update_cell(
+        row_number,
+        11,
+        lon
+    )
+
+    st.success(
+        f"""✅ Logout Recorded Successfully
 📍 Location: {lat}, {lon}
 ⏱ Hours: {working_hours}
 📌 Status: {status}
 """
-            )
+    )
 
-            st.rerun()
+    st.rerun()
 
-        except Exception as e:
-            st.error(f"❌ Sheet update failed: {e}")
-            st.stop()
+except Exception as e:
+    st.error(f"❌ Sheet update failed: {e}")
+    st.stop()
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
 # ============================================================
