@@ -243,9 +243,12 @@ if not st.session_state["logged_in"]:
         type="password"
     )
 
-    if st.button("Login"):
+    st.button(
+        "🔑 Login",
+        key="login_btn"
+    )
 
-        if username in users and users[username]["password"] == password:
+    if username in users and users[username]["password"] == password:
 
             st.session_state["logged_in"] = True
             st.session_state["role"] = users[username]["role"]
@@ -253,8 +256,8 @@ if not st.session_state["logged_in"]:
 
             st.rerun()
 
-        else:
-            st.error("❌ Invalid Credentials")
+    else:
+        st.error("Invalid Credentials")
 
     st.stop()
 
@@ -399,7 +402,10 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
 
-    if st.button("🟢 Login Attendance", key="login_att_btn"):
+    if st.button(
+    "🔑 Login",
+    key="login_btn"
+    ):
         st.success("✅ Login button clicked")
         # ✅ CURRENT TIME
         login_time_str = get_ist().strftime("%H:%M:%S")
@@ -489,27 +495,19 @@ with col1:
         # ✅ REFRESH UI
         st.rerun()
 
-# ============================================================
-# ✅ LOGOUT ATTENDANCE
-# ============================================================
-
-# ============================================================
-# ✅ LOGOUT ATTENDANCE
-# ============================================================
-
 with col2:
-    if st.button("🔴 Logout Attendance"):
+    if st.button(
+        "🔴 Logout Attendance",
+        key="logout_attendance_btn"
+    ):
 
         lat, lon = get_location_values()
 
         sheet, _ = connect_sheet()
 
-        st.write("Sheet connected:", sheet is not None)
-
         df = load_attendance()
         df.columns = df.columns.str.strip()
 
-        # Format Date column
         df["Date"] = pd.to_datetime(
             df["Date"],
             errors="coerce"
@@ -517,7 +515,6 @@ with col2:
 
         today_date = selected_date.strftime("%Y-%m-%d")
 
-        # Find today's record for employee
         user_today = df[
             (df["Date"] == today_date) &
             (df["Employee"] == employee)
@@ -529,7 +526,6 @@ with col2:
 
         last_index = user_today.index[-1]
 
-        # Get Login Time
         login_str = str(
             user_today.iloc[-1]["Login"]
         ).strip()
@@ -539,15 +535,10 @@ with col2:
             errors="coerce"
         )
 
-        # Current IST Time
         logout_time = pd.to_datetime(
             get_ist(),
             errors="coerce"
         )
-
-        # Debug
-        st.write("Login Time:", login_time)
-        st.write("Logout Time:", logout_time)
 
         if pd.isna(login_time):
             st.error("❌ Invalid login time")
@@ -557,7 +548,6 @@ with col2:
             st.error("❌ Invalid logout time")
             st.stop()
 
-        # Check if logout already done
         existing_logout = str(
             user_today.iloc[-1]["Logout"]
         ).strip()
@@ -566,7 +556,6 @@ with col2:
             st.warning("⚠ Logout already completed")
             st.stop()
 
-        # Remove timezone if present
         try:
             login_time = login_time.tz_localize(None)
         except Exception:
@@ -577,11 +566,9 @@ with col2:
         except Exception:
             pass
 
-        # Overnight shift handling
         if logout_time < login_time:
             logout_time += pd.Timedelta(days=1)
 
-        # Calculate hours
         time_diff = logout_time - login_time
 
         total_hours = time_diff.total_seconds() / 3600
@@ -598,6 +585,7 @@ with col2:
         row_number = last_index + 2
 
         try:
+
             sheet.update_cell(
                 row_number,
                 4,
@@ -642,105 +630,6 @@ with col2:
         except Exception as e:
             st.error(f"❌ Sheet update failed: {e}")
             st.stop()
-
-# ===========================
-# REMOVE TIMEZONE DIFFERENCES
-# ===========================
-
-try:
-    if login_time.tzinfo is not None:
-        login_time = login_time.tz_localize(None)
-except Exception as e:
-    st.write("Login tz_localize issue:", e)
-
-try:
-    if logout_time.tzinfo is not None:
-        logout_time = logout_time.tz_localize(None)
-except Exception as e:
-    st.write("Logout tz_localize issue:", e)
-
-st.write("🔍 DEBUG - Login After Cleanup:", login_time)
-st.write("🔍 DEBUG - Logout After Cleanup:", logout_time)
-
-# ===========================
-# CALCULATE HOURS
-# ===========================
-
-try:
-
-    if logout_time < login_time:
-        logout_time += pd.Timedelta(days=1)
-
-    time_diff = logout_time - login_time
-
-    total_hours = time_diff.total_seconds() / 3600
-
-    working_hours = str(time_diff).split(".")[0]
-
-    if total_hours >= 8:
-        status = "Full Day"
-    elif total_hours >= 4:
-        status = "Half Day"
-    else:
-        status = "Short Day"
-
-except Exception as e:
-    st.error(f"❌ Time calculation error: {e}")
-
-    st.write("Login Time:", login_time)
-    st.write("Logout Time:", logout_time)
-
-    st.write("Login Type:", type(login_time))
-    st.write("Logout Type:", type(logout_time))
-
-    st.stop()
-
-row_number = last_index + 2
-
-try:
-    sheet.update_cell(
-        row_number,
-        4,
-        logout_time.strftime("%H:%M:%S")
-    )
-
-    sheet.update_cell(
-        row_number,
-        5,
-        working_hours
-    )
-
-    sheet.update_cell(
-        row_number,
-        6,
-        status
-    )
-
-    sheet.update_cell(
-        row_number,
-        10,
-        lat
-    )
-
-    sheet.update_cell(
-        row_number,
-        11,
-        lon
-    )
-
-    st.success(
-        f"""✅ Logout Recorded Successfully
-📍 Location: {lat}, {lon}
-⏱ Hours: {working_hours}
-📌 Status: {status}
-"""
-    )
-
-    st.rerun()
-
-except Exception as e:
-    st.error(f"❌ Sheet update failed: {e}")
-    st.stop()
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
 # ============================================================
