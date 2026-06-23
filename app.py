@@ -990,9 +990,7 @@ if role == "admin":
 # ============================================================
 # ✅ ATTENDANCE RECORDS
 # ============================================================
-if role == "admin":
-
-    st.subheader("📋 Attendance Records")
+st.subheader("📋 Attendance Records")
 
 df = load_attendance()
 
@@ -1227,10 +1225,7 @@ st.divider()
 
 if not monthly_df.empty:
 
-    if role == "admin":
-
-        st.subheader("📊 Attendance Details")
-
+    st.markdown("### 📅 Attendance Details")
 
     # ✅ Show entries dropdown
     entries = st.selectbox(
@@ -1264,12 +1259,7 @@ else:
 # ✅ FULL DOWNLOAD (ALL DATA)
 # ============================================================
 
-if role == "admin":
-
-    st.download_button(
-        "📥 Download Full Data",
-        ...
-    )
+st.markdown("### 📥 Download Full Data")
 
 st.download_button(
     label="📥 Download Full Attendance",
