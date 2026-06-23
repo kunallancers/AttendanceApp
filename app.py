@@ -708,24 +708,28 @@ if role == "admin":
 
     st.markdown("### ⚠️ Admin Controls")
 
-    # ✅ STEP 1 — Confirmation Checkbox
+    # ========================================================
+    # ✅ CLEAR ATTENDANCE
+    # ========================================================
+
     confirm_clear = st.checkbox(
         "Confirm Clear Attendance",
         key="confirm_clear_attendance"
     )
 
-    # ✅ STEP 2 — Action Button
     if confirm_clear:
 
-        if st.button("🧹 Clear Attendance", key="clear_attendance_btn"):
+        if st.button(
+            "🧹 Clear Attendance",
+            key="clear_attendance_btn"
+        ):
 
             try:
+
                 sheet, _ = connect_sheet()
 
-                # ✅ Clear whole sheet
                 sheet.clear()
 
-                # ✅ Recreate headers (VERY IMPORTANT)
                 sheet.append_row([
                     "Date",
                     "Employee",
@@ -740,68 +744,85 @@ if role == "admin":
                     "Logout Longitude"
                 ])
 
-                # ✅ CLEAR CACHE
-                
+                try:
+                    load_attendance.clear()
+                except:
+                    pass
 
-                st.success("✅ Attendance Cleared Successfully")
+                st.success(
+                    "✅ Attendance Cleared Successfully"
+                )
 
                 st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Error clearing attendance: {e}")
+                st.error(
+                    f"❌ Error clearing attendance: {e}"
+                )
 
-if st.button("🧹 Remove Duplicate Entries", key="remove_duplicates_btn"):
+    # ========================================================
+    # ✅ REMOVE DUPLICATE ENTRIES
+    # ========================================================
 
-    st.write("✅ Button Clicked")
-    sheet, _ = connect_sheet()
-    df = load_attendance()
-    
-    df.columns = df.columns.str.strip()
+    st.divider()
 
-    df["Date"] = pd.to_datetime(
-    df["Date"], errors="coerce"
-    ).dt.strftime("%Y-%m-%d")
-    if df.empty:
-        st.warning("No data found in sheet")
-        st.stop()
+    if st.button(
+        "🧹 Remove Duplicate Entries",
+        key="remove_duplicates_btn"
+    ):
 
-    # ✅ FORCE Date format (THIS IS THE MAIN FIX ✅)
-    df["Date"] = df["Date"].astype(str).str[:10]
+        try:
 
-    # ✅ Convert Login to datetime
-    df["Login"] = pd.to_datetime(df["Login"], errors="coerce")
+            sheet, _ = connect_sheet()
 
-    # ✅ Sort so latest login comes last
-    df = df.sort_values(by=["Employee", "Date", "Login"])
+            df = load_attendance()
 
-    # ✅ Remove duplicates → keep last (latest login)
-    # Prefer completed records (those with Logout)
-    df_clean = (
-    df.sort_values(
-        by=["Employee", "Date", "Logout"],
-        na_position="first"
-    )
-    .groupby(["Employee", "Date"], as_index=False)
-    .last()
-)
+            df.columns = df.columns.str.strip()
 
-    # ✅ Convert Login back to string
-    df_clean["Login"] = df_clean["Login"].astype(str)
+            if df.empty:
 
-    # ✅ Clear sheet
-    sheet.clear()
+                st.warning(
+                    "⚠ No data found in attendance sheet"
+                )
+                st.stop()
 
-    # ✅ Convert dataframe to list of lists
-    data_to_write = [
-        df_clean.columns.tolist()
-    ] + df_clean.values.tolist()
+            df["Date"] = pd.to_datetime(
+                df["Date"],
+                errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
 
-    # ✅ Write entire sheet at once (VERY IMPORTANT)
-    sheet.update("A1", data_to_write)
-    
-    
+            # Remove only truly identical rows
+            df_clean = df.drop_duplicates()
 
-    st.success("✅ Duplicate entries removed successfully")
+            removed_count = len(df) - len(df_clean)
+
+            sheet.clear()
+
+            data_to_write = [
+                df_clean.columns.tolist()
+            ] + df_clean.values.tolist()
+
+            sheet.update(
+                "A1",
+                data_to_write
+            )
+
+            try:
+                load_attendance.clear()
+            except:
+                pass
+
+            st.success(
+                f"✅ Removed {removed_count} duplicate entries"
+            )
+
+            st.rerun()
+
+        except Exception as e:
+
+            st.error(
+                f"❌ Error removing duplicates: {e}"
+            )
 # ============================================================
 # ✅ LEAVE MANAGEMENT
 # ============================================================
