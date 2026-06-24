@@ -403,91 +403,97 @@ col1, col2, col3 = st.columns(3)
 with col1:
 
     if st.button(
-    "🔑 Login",
-    key="login_btn"
+        "🔑 Login",
+        key="login_btn"
     ):
+
         st.success("✅ Login button clicked")
+
         # ✅ CURRENT TIME
         login_time_str = get_ist().strftime("%H:%M:%S")
 
         # ✅ DATE
         date_str = selected_date.strftime("%Y-%m-%d")
-# ====================================================
-# ✅ CHECK APPROVED LEAVE
-# ====================================================
-
-employee_clean = str(employee).strip().upper()
-
-leave_df = load_leave()
-
-approved_leave = leave_df[
-    (
-        leave_df["Employee"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-        == employee_clean
-    ) &
-    (
-        leave_df["Date"]
-        .astype(str)
-        .str[:10]
-        == date_str
-    ) &
-    (
-        leave_df["Status"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-        == "APPROVED"
-    )
-]
-
-if not approved_leave.empty:
-
-    if role != "admin":
-
-        st.error(
-            "❌ Approved leave exists for today.\n"
-            "Attendance cannot be marked.\n"
-            "Please contact Admin if attendance is required."
-        )
-
-        st.stop()
-
-    else:
-
-        st.warning(
-            f"⚠ {employee} has an approved leave for {date_str}.\n"
-            "Admin override allowed."
-        )
-
-# ✅ LOCATION
-lat, lon = get_location_values()
-if lat is None:
-    lat = "NA"
-if lon is None:
-    lon = "NA"
-
-# ✅ CONNECT SHEET
-sheet, _ = connect_sheet()
-
-# ✅ LOAD LATEST DATA
-load_attendance.clear()
-df = load_attendance()
-
-        
-# ✅ CLEAN DATA (SAFE)
-if df.empty:
-        df = pd.DataFrame(columns=["Date", "Employee", "Logout"])
-        
-        df.columns = df.columns.str.strip()
-
 
         # ✅ NORMALIZE EMPLOYEE
         employee_clean = str(employee).strip().upper()
 
+        # ====================================================
+        # ✅ CHECK APPROVED LEAVE
+        # ====================================================
+
+        leave_df = load_leave()
+
+        approved_leave = leave_df[
+            (
+                leave_df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+                == employee_clean
+            ) &
+            (
+                leave_df["Date"]
+                .astype(str)
+                .str[:10]
+                == date_str
+            ) &
+            (
+                leave_df["Status"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+                == "APPROVED"
+            )
+        ]
+
+        if not approved_leave.empty:
+
+            if role != "admin":
+
+                st.error(
+                    "❌ Approved leave exists for today.\n"
+                    "Attendance cannot be marked.\n"
+                    "Please contact Admin if attendance is required."
+                )
+
+                st.stop()
+
+            else:
+
+                st.warning(
+                    f"⚠ {employee} has an approved leave for {date_str}.\n"
+                    "Admin override allowed."
+                )
+
+        # ✅ LOCATION
+        lat, lon = get_location_values()
+
+        if lat is None:
+            lat = "NA"
+
+        if lon is None:
+            lon = "NA"
+
+        # ✅ CONNECT SHEET
+        sheet, _ = connect_sheet()
+
+        # ✅ LOAD LATEST DATA
+        load_attendance.clear()
+
+        df = load_attendance()
+
+        # ✅ CLEAN DATA (SAFE)
+        if df.empty:
+
+            df = pd.DataFrame(
+                columns=["Date", "Employee", "Logout"]
+            )
+
+        df.columns = df.columns.str.strip()
+
         if "Employee" in df.columns:
+
             df["Employee"] = (
                 df["Employee"]
                 .astype(str)
@@ -498,63 +504,72 @@ if df.empty:
         # ====================================================
         # ✅ PREVENT DUPLICATE LOGIN
         # ====================================================
+
         existing_today = df[
             (df["Date"] == date_str) &
             (df["Employee"] == employee_clean)
         ]
 
         if not existing_today.empty:
-            last_logout = str(existing_today.iloc[-1]["Logout"]).strip()
+
+            last_logout = str(
+                existing_today.iloc[-1]["Logout"]
+            ).strip()
 
             if last_logout in ["", "nan", "None"]:
-                st.warning("⚠ Already logged in today")
+
+                st.warning(
+                    "⚠ Already logged in today"
+                )
+
                 st.stop()
 
-# ====================================================
-# ✅ SAVE LOGIN (CORRECT ORDER ✅)
-# ====================================================
+        # ====================================================
+        # ✅ SAVE LOGIN
+        # ====================================================
 
-try:
-    sheet.append_row([
-        date_str,
-        employee,
-        login_time_str,
-        "",
-        "",
-        "In Progress",
-        attendance_type,
-        lat,
-        lon,
-        "",
-        ""
-    ])
+        try:
 
-    st.success(
-        "✅ Row inserted into sheet"
-    )
+            sheet.append_row([
+                date_str,
+                employee,
+                login_time_str,
+                "",
+                "",
+                "In Progress",
+                attendance_type,
+                lat,
+                lon,
+                "",
+                ""
+            ])
 
-except Exception as e:
+            st.success(
+                "✅ Row inserted into sheet"
+            )
 
-    st.error(
-        f"❌ Login failed: {e}"
-    )
+        except Exception as e:
 
-    st.stop()
+            st.error(
+                f"❌ Login failed: {e}"
+            )
 
-# ✅ CLEAR CACHE
-try:
-    load_attendance.clear()
-except:
-    pass
+            st.stop()
 
-# ✅ SUCCESS MESSAGE
-st.success(
-    f"✅ Login Recorded Successfully\n"
-    f"⏰ {login_time_str} | 📍 {lat}, {lon}"
-)
+        # ✅ CLEAR CACHE
+        try:
+            load_attendance.clear()
+        except:
+            pass
 
-# ✅ REFRESH UI
-st.rerun()
+        # ✅ SUCCESS MESSAGE
+        st.success(
+            f"✅ Login Recorded Successfully\n"
+            f"⏰ {login_time_str} | 📍 {lat}, {lon}"
+        )
+
+        # ✅ REFRESH UI
+        st.rerun()
 
 with col2:
     if st.button(
