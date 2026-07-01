@@ -579,78 +579,95 @@ with col2:
 
         lat, lon = get_location_values()
 
-        sheet, _ = connect_sheet()
+sheet, _ = connect_sheet()
 
-        df = load_attendance()
-        df.columns = df.columns.str.strip()
+# ✅ Always load fresh attendance data
+load_attendance.clear()
 
-        df["Date"] = pd.to_datetime(
-            df["Date"],
-            errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
+df = load_attendance()
 
-        today_date = selected_date.strftime("%Y-%m-%d")
+df.columns = df.columns.str.strip()
 
-        user_today = df[
-            (df["Date"] == today_date) &
-            (df["Employee"] == employee)
-        ]
+df["Date"] = pd.to_datetime(
+    df["Date"],
+    errors="coerce"
+).dt.strftime("%Y-%m-%d")
 
-        if user_today.empty:
-            st.warning("⚠ No login record found")
-            st.stop()
+# ✅ Normalize employee names
+employee_clean = str(employee).strip().upper()
 
-        last_index = user_today.index[-1]
+df["Employee"] = (
+    df["Employee"]
+    .astype(str)
+    .str.strip()
+    .str.upper()
+)
 
-        login_str = str(
-            user_today.iloc[-1]["Login"]
+today_date = selected_date.strftime("%Y-%m-%d")
+
+user_today = df[
+    (df["Date"] == today_date) &
+    (df["Employee"] == employee_clean)
+]
+
+if user_today.empty:
+    st.warning("⚠ No login record found")
+    st.stop()
+
+    last_index = user_today.index[-1]
+
+    login_str = str(
+        user_today.iloc[-1]["Login"]
         ).strip()
 
-        login_time = pd.to_datetime(
+    login_time = pd.to_datetime(
             f"{today_date} {login_str}",
             errors="coerce"
         )
 
-        logout_time = pd.to_datetime(
+    logout_time = pd.to_datetime(
             get_ist(),
             errors="coerce"
         )
 
-        if pd.isna(login_time):
+    if pd.isna(login_time):
             st.error("❌ Invalid login time")
             st.stop()
 
-        if pd.isna(logout_time):
+    if pd.isna(logout_time):
             st.error("❌ Invalid logout time")
             st.stop()
 
-        existing_logout = str(
-            user_today.iloc[-1]["Logout"]
-        ).strip()
+    existing_logout = str(
+                    user_today.iloc[-1]["Logout"]
+                ).strip()
 
-        if existing_logout not in ["", "nan", "None"]:
+    if existing_logout not in ["", "nan", "None"]:
             st.warning("⚠ Logout already completed")
             st.stop()
 
-        try:
-            login_time = login_time.tz_localize(None)
-        except Exception:
-            pass
+    try:
+        login_time = login_time.tz_localize(None)
+    except Exception:
+        pass
 
         try:
             logout_time = logout_time.tz_localize(None)
         except Exception:
             pass
 
+        # ✅ Handle overnight shifts
         if logout_time < login_time:
             logout_time += pd.Timedelta(days=1)
 
+        # ✅ Calculate working hours
         time_diff = logout_time - login_time
 
         total_hours = time_diff.total_seconds() / 3600
 
         working_hours = str(time_diff).split(".")[0]
 
+        # ✅ Attendance Status
         if total_hours >= 8:
             status = "Full Day"
         elif total_hours >= 4:
@@ -692,6 +709,12 @@ with col2:
                 lon
             )
 
+            # ✅ Clear attendance cache
+            try:
+                load_attendance.clear()
+            except:
+                pass
+
             st.success(
                 f"""✅ Logout Recorded Successfully
 
@@ -704,7 +727,11 @@ with col2:
             st.rerun()
 
         except Exception as e:
-            st.error(f"❌ Sheet update failed: {e}")
+
+            st.error(
+                f"❌ Sheet update failed: {e}"
+            )
+
             st.stop()
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
