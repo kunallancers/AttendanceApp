@@ -797,21 +797,7 @@ if not today_data.empty:
         ],
         use_container_width=True
     )
-    st.dataframe(
-        display_df[
-            [
-                "S.No",
-                "Employee",
-                "Login",
-                "Logout",
-                "Working Hours",
-                "Status",
-                "Type"
-            ]
-        ],
-        use_container_width=True
-    )
-
+    
 else:
 
     st.info("No attendance recorded today.")
