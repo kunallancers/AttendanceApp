@@ -744,9 +744,6 @@ df_today["Date"] = pd.to_datetime(
 ).dt.strftime("%Y-%m-%d")
 
 today_date = date.today().strftime("%Y-%m-%d")
-df_today = load_attendance()
-st.write("Rows loaded:", len(df_today))
-st.dataframe(df_today)
 if role == "admin":
 
     today_data = df_today[
