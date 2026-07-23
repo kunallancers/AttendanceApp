@@ -257,7 +257,8 @@ if not st.session_state["logged_in"]:
             st.rerun()
 
     else:
-        st.error("Invalid Credentials")
+        
+        st.error("❌ Invalid Credentials")
 
     st.stop()
 
