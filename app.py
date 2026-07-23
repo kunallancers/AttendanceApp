@@ -1207,10 +1207,12 @@ with col2:
 
 # ✅ Load data (IMPORTANT ✅)
 df = load_attendance()
+
 df.columns = df.columns.str.strip()
 
 df["Date"] = pd.to_datetime(
-    df["Date"], errors="coerce"
+    df["Date"], 
+    errors="coerce"
 ).dt.strftime("%Y-%m-%d")
 # ✅ Check if data exists
 if df.empty:
@@ -1221,23 +1223,11 @@ if df.empty:
 if "Date" not in df.columns:
     st.error("❌ Date column missing in data")
     st.stop()
-
-# ========================================================
-# ✅ PREPARE DATA (FINAL VERSION ✅)
-# ========================================================
-
-df = load_attendance()
-
-df.columns = df.columns.str.strip()
-
-# ✅ Convert Date safely
-df["Date"] = pd.to_datetime(
+# ✅ Create Month column
+df["Month"] = pd.to_datetime(
     df["Date"],
     errors="coerce"
-)
-
-# ✅ Create Month column
-df["Month"] = df["Date"].dt.strftime("%Y-%m")
+).dt.strftime("%Y-%m")
 
 # ========================================================
 # ✅ FILTERS
