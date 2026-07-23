@@ -248,7 +248,7 @@ if not st.session_state["logged_in"]:
         key="login_btn"
     )
 
-    if username in users and users[username]["password"] == password:
+    if (username in users and users[username]["password"] == password):
 
             st.session_state["logged_in"] = True
             st.session_state["role"] = users[username]["role"]
