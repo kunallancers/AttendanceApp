@@ -775,9 +775,32 @@ if not today_data.empty:
         "Logout"
     ].fillna("Pending")
 
+    display_df = display_df.reset_index(drop=True)
+
+    display_df.insert(
+        0,
+        "S.No",
+        range(1, len(display_df) + 1)
+    )
+
     st.dataframe(
         display_df[
             [
+                "S.No",
+                "Employee",
+                "Login",
+                "Logout",
+                "Working Hours",
+                "Status",
+                "Type"
+            ]
+        ],
+        use_container_width=True
+    )
+    st.dataframe(
+        display_df[
+            [
+                "S.No",
                 "Employee",
                 "Login",
                 "Logout",
