@@ -793,15 +793,17 @@ if not today_data.empty:
                 "Logout",
                 "Working Hours",
                 "Status",
-                "Type"
+                "Type",
+                "Login Latitude",
+                "Login Longitude",
+                "Logout Latitude",
+                "Logout Longitude"
+
             ]
         ],
-        use_container_width=True
+        use_container_width=True,
+        hide_index=True
     )
-    
-else:
-
-    st.info("No attendance recorded today.")
 
 # ============================================================
 # ✅ ADMIN CONTROLS
