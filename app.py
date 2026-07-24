@@ -1299,22 +1299,48 @@ st.divider()
 st.markdown("### 📊 Summary")
 
 total_records = len(monthly_df)
-full_days = len(monthly_df[monthly_df["Status"] == "Full Day"])
-half_days = len(monthly_df[monthly_df["Status"] == "Half Day"])
 
-col1, col2, col3 = st.columns(3)
+unique_employees = (
+    monthly_df["Employee"]
+    .nunique()
+)
+
+full_days = len(
+    monthly_df[
+        monthly_df["Status"] == "Full Day"
+    ]
+)
+
+half_days = len(
+    monthly_df[
+        monthly_df["Status"] == "Half Day"
+    ]
+)
+
+short_days = len(
+    monthly_df[
+        monthly_df["Status"] == "Short Day"
+    ]
+)
+
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     st.metric("📋 Total Records", total_records)
 
 with col2:
-    st.metric("✅ Full Days", full_days)
+    st.metric("👥 Employees", unique_employees)
 
 with col3:
+    st.metric("✅ Full Days", full_days)
+
+with col4:
     st.metric("⏱ Half Days", half_days)
 
-st.divider()
+with col5:
+    st.metric("⚠️ Short Days", short_days)
 
+st.divider()
 
 # ============================================================
 # ✅ TABLE + DOWNLOAD
