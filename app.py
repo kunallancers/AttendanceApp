@@ -1,13 +1,13 @@
-import streamlit as st
-from streamlit_geolocation import streamlit_geolocation
-import streamlit.components.v1 as components
-import pandas as pd
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, date, timezone
-import pytz
 import os
 import time
+from datetime import date, datetime, timezone
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+import pytz
+import streamlit as st
+import streamlit.components.v1 as components
+from streamlit_geolocation import streamlit_geolocation
 
 # ============================================================
 # ✅ PAGE CONFIG (MUST BE FIRST STREAMLIT COMMAND)
@@ -17,31 +17,14 @@ st.set_page_config(
     page_title="Attendance Management System",
     layout="wide"
 )
+
 # ============================================================
 # ✅ APP STYLING (BACKGROUND + UI)
 # ============================================================
 
-from datetime import datetime, date, timezone
-import pytz
-import os
-import time
-
-# ✅ Auto refresh every 5 seconds
-# if "last_refresh" not in st.session_state:
-#     st.session_state["last_refresh"] = time.time()
-
-# current_time = time.time()
-
-# if current_time - st.session_state["last_refresh"] > 5:
-#     st.session_state["last_refresh"] = current_time
-#     st.rerun()
-
 # ============================================================
 # ✅ GOOGLE SHEET CONNECTION (FINAL STABLE VERSION)
 # ============================================================
-
-from oauth2client.service_account import ServiceAccountCredentials
-import gspread
 
 
 @st.cache_resource  # ✅ CRITICAL FIX (prevents API errors)
@@ -72,6 +55,8 @@ def connect_sheet():
         st.error("❌ Google Sheet connection failed")
         st.error(str(e))  # optional debug
         st.stop()
+
+
 # ============================================================
 # ✅ IST TIME
 # ============================================================
@@ -80,6 +65,8 @@ def get_ist():
     return pd.Timestamp.now(
         tz="Asia/Kolkata"
     ).tz_localize(None)
+
+
 # ============================================================
 # ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
 # ============================================================
@@ -144,6 +131,8 @@ def load_attendance():
     except Exception as e:
         st.error(f"❌ Error loading attendance: {e}")
         return df   # ✅ RETURN SAFE EMPTY DF (FIX)
+
+
 # ============================================================
 # ✅ LOAD LEAVE (SAFE VERSION ✅ PLACE HERE)
 # ============================================================
@@ -179,6 +168,7 @@ def load_leave():
     except Exception as e:
         st.error(f"❌ Error loading leave: {e}")
         return pd.DataFrame()
+
 
 # ✅ ALWAYS LOAD FRESH DATA AFTER CALL
 df = load_attendance()
@@ -236,19 +226,17 @@ if not st.session_state["logged_in"]:
 
     st.title("🔐 Login")
 
-    username = st.text_input("Username")
+    username = st.text_input("Username", key="auth_login_user")
 
     password = st.text_input(
         "Password",
-        type="password"
+        type="password",
+        key="auth_login_pass"
     )
 
-    st.button(
-        "🔑 Login",
-        key="login_btn"
-    )
+    if st.button("🔑 Login", key="login_btn_auth"):
 
-    if (username in users and users[username]["password"] == password):
+        if (username in users and users[username]["password"] == password):
 
             st.session_state["logged_in"] = True
             st.session_state["role"] = users[username]["role"]
@@ -256,16 +244,16 @@ if not st.session_state["logged_in"]:
 
             st.rerun()
 
-    else:
-        
-        st.error("❌ Invalid Credentials")
+        else:
+
+            st.error("❌ Invalid Credentials")
 
     st.stop()
 
 # ============================================================
 # ✅ LOGOUT
 # ============================================================
-if st.button("Logout"):
+if st.button("Logout", key="main_app_logout_btn"):
 
     st.session_state.clear()
 
@@ -273,18 +261,18 @@ if st.button("Logout"):
 
 role = st.session_state["role"]
 
-employee = st.session_state["employee"]
+logged_in_employee = st.session_state["employee"]
 
 # ✅ ADD THIS
 ADMIN_USERS = ["ADMIN"]
 
-st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
+st.markdown(f"<h4 style='text-align: center;'>Welcome, {logged_in_employee}</h4>", unsafe_allow_html=True)
 
 # ✅ Show logged in user
-col1, col2 = st.columns([6, 1])
+col1_user_info, col2_user_info = st.columns([6, 1])
 
-with col1:
-    st.success(f"✅ Logged in as: {employee}")
+with col1_user_info:
+    st.success(f"✅ Logged in as: {logged_in_employee}")
 
 # ============================================================
 # ✅ LOCATION INITIALIZATION + FETCH
@@ -310,10 +298,10 @@ def get_location_values():
 
     loc = st.session_state.get("location", {})
 
-    lat = loc.get("lat") or "NA"
-    lon = loc.get("lon") or "NA"
+    lat_val = loc.get("lat") or "NA"
+    lon_val = loc.get("lon") or "NA"
 
-    return lat, lon
+    return lat_val, lon_val
 
 
 # ============================================================
@@ -354,15 +342,17 @@ if role == "employee":
     selected_date = st.date_input(
         "Attendance Date",
         today,
-        today,
-        today
+        min_value=today,
+        max_value=today,
+        key="emp_date_selector"
     )
 
 else:
 
     selected_date = st.date_input(
         "Attendance Date",
-        today
+        today,
+        key="admin_date_selector"
     )
 
 date_str = selected_date.strftime("%Y-%m-%d")
@@ -377,6 +367,8 @@ if role == "admin":
         sorted(df_emp["Employee Name"].unique()),
         key="employee_filter_admin"
     )
+else:
+    employee = logged_in_employee
 
 # ============================================================
 # ✅ ATTENDANCE TYPE
@@ -388,24 +380,25 @@ attendance_type = st.selectbox(
         "Present WFH",
         "Half Day",
         "Leave"
-    ]
+    ],
+    key="attendance_type_selector"
 )
 
 # ============================================================
 # ✅ ACTION BUTTONS
 # ============================================================
 
-col1, col2, col3 = st.columns(3)
+col1_act, col2_act, col3_act = st.columns(3)
 
 # ============================================================
 # ✅ LOGIN ATTENDANCE (FINAL CLEAN VERSION ✅)
 # ============================================================
 
-with col1:
+with col1_act:
 
     if st.button(
         "🔑 Login",
-        key="login_btn"
+        key="login_att_action_btn"
     ):
 
         st.success("✅ Login button clicked")
@@ -560,7 +553,7 @@ with col1:
         # ✅ CLEAR CACHE
         try:
             load_attendance.clear()
-        except:
+        except Exception:
             pass
 
         # ✅ SUCCESS MESSAGE
@@ -572,7 +565,7 @@ with col1:
         # ✅ REFRESH UI
         st.rerun()
 
-with col2:
+with col2_act:
     if st.button(
         "🔴 Logout Attendance",
         key="logout_attendance_btn"
@@ -729,6 +722,7 @@ with col2:
             )
 
             st.stop()
+
 # ============================================================
 # ✅ TODAY'S ATTENDANCE
 # ============================================================
@@ -853,7 +847,7 @@ if role == "admin":
 
                 try:
                     load_attendance.clear()
-                except:
+                except Exception:
                     pass
 
                 st.success(
@@ -916,7 +910,7 @@ if role == "admin":
 
             try:
                 load_attendance.clear()
-            except:
+            except Exception:
                 pass
 
             st.success(
@@ -930,6 +924,7 @@ if role == "admin":
             st.error(
                 f"❌ Error removing duplicates: {e}"
             )
+
 # ============================================================
 # ✅ LEAVE MANAGEMENT
 # ============================================================
@@ -951,7 +946,8 @@ if role == "employee":
         start_date = st.date_input(
             "Leave From",
             today,
-            min_value=today
+            min_value=today,
+            key="emp_leave_start_date"
         )
 
     with colB:
@@ -959,12 +955,13 @@ if role == "employee":
         end_date = st.date_input(
             "Leave To",
             start_date,
-            min_value=start_date
+            min_value=start_date,
+            key="emp_leave_end_date"
         )
 
-    reason = st.text_input("Leave Reason")
+    reason = st.text_input("Leave Reason", key="emp_leave_reason_input")
 
-    if st.button("Submit Leave"):
+    if st.button("Submit Leave", key="submit_leave_request_btn"):
 
         if end_date < start_date:
 
@@ -1044,7 +1041,7 @@ if role == "admin":
 
             with c1:
 
-                if st.button(f"Approve {i}"):
+                if st.button(f"Approve {i}", key=f"approve_leave_btn_{i}"):
 
                     _, leave_sheet = connect_sheet()
 
@@ -1078,7 +1075,7 @@ if role == "admin":
 
             with c2:
 
-                if st.button(f"Reject {i}"):
+                if st.button(f"Reject {i}", key=f"reject_leave_btn_{i}"):
 
                     _, leave_sheet = connect_sheet()
 
@@ -1128,14 +1125,16 @@ if not df.empty:
             emp_filter = st.selectbox(
                 "Filter Employee",
                 ["All"] +
-                sorted(df["Employee"].dropna().unique())
+                sorted(df["Employee"].dropna().unique()),
+                key="admin_filter_emp_select"
             )
 
         with f2:
 
             date_filter = st.date_input(
                 "Filter Date",
-                None
+                None,
+                key="admin_filter_date_input"
             )
 
         if emp_filter != "All":
@@ -1172,7 +1171,7 @@ if not df.empty:
         df["Logout"],
         errors="coerce"
     ).dt.strftime("%H:%M:%S")
-    
+
 # ✅ Fix column type issues (safe version)
 if "Working Hours" in df.columns:
     df["Working Hours"] = df["Working Hours"].astype(str)
@@ -1194,16 +1193,17 @@ selected_employee = st.selectbox(
 # ✅ FILTERS (FIXED ALIGNMENT)
 # ========================================================
 
-col1, col2 = st.columns(2)
+col1_flt, col2_flt = st.columns(2)
 
-with col1:
+with col1_flt:
     months = ["All"] + sorted(df["Month"].dropna().unique())
     selected_month = st.selectbox(
         "📅 Select Month",
-        months
+        months,
+        key="month_filter_top"
     )
 
-with col2:
+with col2_flt:
     employee_list = ["All"] + sorted(
         df["Employee"].dropna().astype(str).unique()
     )
@@ -1220,9 +1220,10 @@ df = load_attendance()
 df.columns = df.columns.str.strip()
 
 df["Date"] = pd.to_datetime(
-    df["Date"], 
+    df["Date"],
     errors="coerce"
 ).dt.strftime("%Y-%m-%d")
+
 # ✅ Check if data exists
 if df.empty:
     st.info("⚠ No attendance data found")
@@ -1232,6 +1233,7 @@ if df.empty:
 if "Date" not in df.columns:
     st.error("❌ Date column missing in data")
     st.stop()
+
 # ✅ Create Month column
 df["Month"] = pd.to_datetime(
     df["Date"],
@@ -1242,10 +1244,10 @@ df["Month"] = pd.to_datetime(
 # ✅ FILTERS
 # ========================================================
 
-col1, col2 = st.columns(2)
+col1_mflt, col2_mflt = st.columns(2)
 
 # ✅ Month filter
-with col1:
+with col1_mflt:
     month_list = sorted(df["Month"].dropna().unique(), reverse=True)
 
     if not month_list:
@@ -1259,7 +1261,7 @@ with col1:
     )
 
 # ✅ Employee filter
-with col2:
+with col2_mflt:
     employee_list = df["Employee"].dropna().astype(str).unique().tolist()
     employee_list = sorted(employee_list)
     employee_list = ["All"] + employee_list
@@ -1323,21 +1325,21 @@ short_days = len(
     ]
 )
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1_kpi, col2_kpi, col3_kpi, col4_kpi, col5_kpi = st.columns(5)
 
-with col1:
+with col1_kpi:
     st.metric("📋 Total Records", total_records)
 
-with col2:
+with col2_kpi:
     st.metric("👥 Employees", unique_employees)
 
-with col3:
+with col3_kpi:
     st.metric("✅ Full Days", full_days)
 
-with col4:
+with col4_kpi:
     st.metric("⏱ Half Days", half_days)
 
-with col5:
+with col5_kpi:
     st.metric("⚠️ Short Days", short_days)
 
 st.divider()
