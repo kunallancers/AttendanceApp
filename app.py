@@ -1352,33 +1352,37 @@ if not monthly_df.empty:
 
     st.markdown("### 📅 Attendance Details")
 
-    # ✅ Show entries dropdown
-    entries = st.selectbox(
-        "Show entries",
-        [10, 25, 50, 100],
-        index=0,
-        key="entries_month"
+    # ✅ Date Filter within Selected Month
+    available_dates = ["All Dates"] + sorted(monthly_df["Date"].unique())
+
+    selected_detail_date = st.selectbox(
+        "📅 Filter by Date",
+        available_dates,
+        key="attendance_details_date_filter"
     )
 
-    display_df = monthly_df.head(entries)
+    # Apply Date Filter if a specific date is selected
+    if selected_detail_date != "All Dates":
+        display_df = monthly_df[monthly_df["Date"] == selected_detail_date]
+    else:
+        display_df = monthly_df.copy()
 
     # ✅ Show table
-    st.dataframe(display_df, use_container_width=True)
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     st.divider()
 
-    # ✅ Download monthly report
+    # ✅ Download monthly report (or filtered date report)
     st.download_button(
-        label="⬇ Download Monthly Report",
-        data=monthly_df.to_csv(index=False).encode("utf-8"),
-        file_name=f"attendance_{selected_month}.csv",
+        label="⬇ Download Selected Report",
+        data=display_df.to_csv(index=False).encode("utf-8"),
+        file_name=f"attendance_{selected_month}_{selected_detail_date}.csv",
         mime="text/csv",
         key="download_monthly_report"
     )
 
 else:
     st.info("⚠ No data available for selected month")
-
 
 # ============================================================
 # ✅ FULL DOWNLOAD (ALL DATA)
