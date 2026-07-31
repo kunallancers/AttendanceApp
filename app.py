@@ -22,9 +22,27 @@ st.set_page_config(
 # ✅ APP STYLING (BACKGROUND + UI)
 # ============================================================
 
+from datetime import datetime, date, timezone
+import pytz
+import os
+import time
+
+# ✅ Auto refresh every 5 seconds
+# if "last_refresh" not in st.session_state:
+#     st.session_state["last_refresh"] = time.time()
+
+# current_time = time.time()
+
+# if current_time - st.session_state["last_refresh"] > 5:
+#     st.session_state["last_refresh"] = current_time
+#     st.rerun()
+
 # ============================================================
 # ✅ GOOGLE SHEET CONNECTION (FINAL STABLE VERSION)
 # ============================================================
+
+from oauth2client.service_account import ServiceAccountCredentials
+import gspread
 
 
 @st.cache_resource  # ✅ CRITICAL FIX (prevents API errors)
@@ -68,177 +86,795 @@ def get_ist():
 
 
 # ============================================================
-# ✅ LOAD ATTENDANCE (CACHE BYPASS FIX)
+# ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
 # ============================================================
 
-def load_attendance(force_refresh=False):
-    """Loads attendance data directly from Google Sheets."""
-    if force_refresh:
-        st.cache_data.clear()
+@st.cache_data(ttl=1)
+def load_attendance():
+
+    df = pd.DataFrame()   # ✅ ALWAYS DEFINE FIRST (CRITICAL FIX)
 
     try:
         sheet, _ = connect_sheet()
+
         data = sheet.get_all_records()
+
+        # ✅ EMPTY SHEET
+        if not data:
+            return pd.DataFrame(columns=[
+                "Date",
+                "Employee",
+                "Login",
+                "Logout",
+                "Working Hours",
+                "Status",
+                "Type",
+                "Login Latitude",
+                "Login Longitude",
+                "Logout Latitude",
+                "Logout Longitude"
+            ])
+
+        # ✅ CREATE DF
+        df = pd.DataFrame(data)
+
+        # ✅ CLEAN COLUMNS
+        df.columns = df.columns.str.strip()
+
+        # ✅ CHECK REQUIRED COLUMN
+        if "Date" not in df.columns:
+            st.error("❌ 'Date' column missing in sheet")
+            return pd.DataFrame()
+
+        # ✅ CLEAN DATA
+        df["Date"] = pd.to_datetime(
+            df["Date"], errors="coerce"
+        )
+
+        df = df.dropna(subset=["Date"])
+
+        df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
+
+        # ✅ CLEAN EMPLOYEE
+        if "Employee" in df.columns:
+            df["Employee"] = (
+                df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
+
+        return df   # ✅ ALWAYS SAFE
+
+    except Exception as e:
+        st.error(f"❌ Error loading attendance: {e}")
+        return df   # ✅ RETURN SAFE EMPTY DF (FIX)
+
+
+# ============================================================
+# ✅ LOAD LEAVE (SAFE VERSION ✅ PLACE HERE)
+# ============================================================
+def load_leave():
+
+    try:
+        _, leave_sheet = connect_sheet()
+
+        data = leave_sheet.get_all_records()
 
         if not data:
             return pd.DataFrame(columns=[
-                "Date", "Employee", "Login", "Logout", "Working Hours",
-                "Status", "Type", "Login Latitude", "Login Longitude",
-                "Logout Latitude", "Logout Longitude"
+                "Employee",
+                "Date",
+                "Reason",
+                "Status"
             ])
 
         df = pd.DataFrame(data)
         df.columns = df.columns.str.strip()
 
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
-
+        # ✅ Normalize employee name
         if "Employee" in df.columns:
-            df["Employee"] = df["Employee"].astype(str).str.strip().str.upper()
+            df["Employee"] = (
+                df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
 
         return df
 
     except Exception as e:
-        st.error(f"❌ Error loading attendance: {e}")
+        st.error(f"❌ Error loading leave: {e}")
         return pd.DataFrame()
 
 
+# ✅ ALWAYS LOAD FRESH DATA AFTER CALL
+df = load_attendance()
+
 # ============================================================
-# ✅ ACTION BUTTONS (CLOCK IN / CLOCK OUT REFACTORED)
+# ✅ SESSION STATE
+# ============================================================
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+# ============================================================
+# ✅ LOAD EMPLOYEE FILE
+# ============================================================
+try:
+    df_emp = pd.read_excel("employees.xlsx")
+
+except Exception as e:
+    st.error(f"❌ employees.xlsx not found\n\n{e}")
+    st.stop()
+
+df_emp.columns = df_emp.columns.str.strip()
+
+required_columns = ["Employee Name", "Password"]
+
+for col in required_columns:
+    if col not in df_emp.columns:
+        st.error(f"❌ Missing column in employees.xlsx: {col}")
+        st.stop()
+
+# ============================================================
+# ✅ USERS
+# ============================================================
+users = {
+    "admin": {
+        "password": "admin123",
+        "role": "admin",
+        "employee": "ADMIN"
+    }
+}
+
+for _, row in df_emp.iterrows():
+
+    username = str(row["Employee Name"]).split()[0].lower()
+
+    users[username] = {
+        "password": str(row["Password"]),
+        "role": "employee",
+        "employee": row["Employee Name"]
+    }
+
+# ============================================================
+# ✅ LOGIN PAGE
+# ============================================================
+if not st.session_state["logged_in"]:
+
+    st.title("🔐 Login")
+
+    username = st.text_input("Username", key="auth_login_user")
+
+    password = st.text_input(
+        "Password",
+        type="password",
+        key="auth_login_pass"
+    )
+
+    if st.button("🔑 Login", key="login_btn_auth"):
+
+        if (username in users and users[username]["password"] == password):
+
+            st.session_state["logged_in"] = True
+            st.session_state["role"] = users[username]["role"]
+            st.session_state["employee"] = users[username]["employee"]
+
+            st.rerun()
+
+        else:
+
+            st.error("❌ Invalid Credentials")
+
+    st.stop()
+
+# ============================================================
+# ✅ LOGOUT
+# ============================================================
+if st.button("Logout", key="main_app_logout_btn"):
+
+    st.session_state.clear()
+
+    st.rerun()
+
+role = st.session_state["role"]
+
+employee = st.session_state["employee"]
+
+# ✅ ADD THIS
+ADMIN_USERS = ["ADMIN"]
+
+st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
+
+# ✅ Show logged in user
+col1, col2 = st.columns([6, 1])
+
+with col1:
+    st.success(f"✅ Logged in as: {employee}")
+
+# ============================================================
+# ✅ LOCATION INITIALIZATION + FETCH
 # ============================================================
 
-col1_act, col2_act = st.columns(2)
 
-# --- LOGIN ATTENDANCE ---
-with col1_act:
-    if st.button("🔑 Login", key="login_att_action_btn", use_container_width=True):
+if "location" not in st.session_state:
+    st.session_state["location"] = {}
+
+location = streamlit_geolocation()
+
+if location and location.get("latitude") and location.get("longitude"):
+    st.session_state["location"] = {
+        "lat": location["latitude"],
+        "lon": location["longitude"]
+    }
+
+# ============================================================
+# ✅ SINGLE SOURCE OF TRUTH FOR LOCATION
+# ============================================================
+
+def get_location_values():
+
+    loc = st.session_state.get("location", {})
+
+    lat = loc.get("lat") or "NA"
+    lon = loc.get("lon") or "NA"
+
+    return lat, lon
+
+
+# ============================================================
+# ✅ STEP 3: DISPLAY LOCATION
+# ============================================================
+
+# ✅ Get latest values FIRST (IMPORTANT ✅)
+lat, lon = get_location_values()
+
+st.write("📍 Current Location:")
+
+st.write(f"Latitude: {lat}")
+st.write(f"Longitude: {lon}")
+
+# ============================================================
+# ✅ GOOGLE MAPS LINK
+# ============================================================
+
+if lat != "NA" and lon != "NA":
+
+    st.markdown(
+        f"[🌍 Open in Google Maps](https://www.google.com/maps?q={lat},{lon})"
+    )
+
+    st.success("📍 Location captured successfully ✅")
+
+else:
+
+    st.warning("⚠ Please allow location access in your browser")
+
+# ============================================================
+# ✅ DATE SELECTION
+# ============================================================
+today = date.today()
+
+if role == "employee":
+
+    selected_date = st.date_input(
+        "Attendance Date",
+        today,
+        today,
+        today,
+        key="emp_date_selector"
+    )
+
+else:
+
+    selected_date = st.date_input(
+        "Attendance Date",
+        today,
+        key="admin_date_selector"
+    )
+
+date_str = selected_date.strftime("%Y-%m-%d")
+
+# ============================================================
+# ✅ ADMIN EMPLOYEE SELECTION
+# ============================================================
+if role == "admin":
+
+    employee = st.selectbox(
+        "Select Employee",
+        sorted(df_emp["Employee Name"].unique()),
+        key="employee_filter_admin"
+    )
+
+# ============================================================
+# ✅ ATTENDANCE TYPE
+# ============================================================
+attendance_type = st.selectbox(
+    "Attendance Type",
+    [
+        "Present WFO",
+        "Present WFH",
+        "Half Day",
+        "Leave"
+    ],
+    key="attendance_type_selector"
+)
+
+# ============================================================
+# ✅ ACTION BUTTONS
+# ============================================================
+
+col1, col2, col3 = st.columns(3)
+
+# ============================================================
+# ✅ LOGIN ATTENDANCE (FINAL CLEAN VERSION ✅)
+# ============================================================
+
+with col1:
+
+    if st.button(
+        "🔑 Login",
+        key="login_att_action_btn"
+    ):
+
+        st.success("✅ Login button clicked")
+
+        # ✅ CURRENT TIME
         login_time_str = get_ist().strftime("%H:%M:%S")
+
+        # ✅ DATE
         date_str = selected_date.strftime("%Y-%m-%d")
+
+        # ✅ NORMALIZE EMPLOYEE
         employee_clean = str(employee).strip().upper()
 
-        # Fetch fresh data directly from sheet
-        df_att = load_attendance(force_refresh=True)
+        # ====================================================
+        # ✅ CHECK APPROVED LEAVE
+        # ====================================================
 
-        # Check approved leaves
         leave_df = load_leave()
+
         approved_leave = leave_df[
-            (leave_df["Employee"].astype(str).str.strip().str.upper() == employee_clean) &
-            (leave_df["Date"].astype(str).str[:10] == date_str) &
-            (leave_df["Status"].astype(str).str.strip().str.upper() == "APPROVED")
+            (
+                leave_df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+                == employee_clean
+            ) &
+            (
+                leave_df["Date"]
+                .astype(str)
+                .str[:10]
+                == date_str
+            ) &
+            (
+                leave_df["Status"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+                == "APPROVED"
+            )
         ]
 
-        if not approved_leave.empty and role != "admin":
-            st.error("❌ Approved leave exists for today. Attendance cannot be marked.")
-        else:
-            existing_today = df_att[
-                (df_att["Date"] == date_str) &
-                (df_att["Employee"] == employee_clean)
-            ]
+        if not approved_leave.empty:
 
-            if not existing_today.empty:
-                last_logout = str(existing_today.iloc[-1].get("Logout", "")).strip()
-                if last_logout in ["", "nan", "None", "Pending"]:
-                    st.warning("⚠ Already logged in today. Clock out first.")
-                else:
-                    st.warning("⚠ Attendance already completed for today.")
+            if role != "admin":
+
+                st.error(
+                    "❌ Approved leave exists for today.\n"
+                    "Attendance cannot be marked.\n"
+                    "Please contact Admin if attendance is required."
+                )
+
+                st.stop()
+
             else:
-                lat_val, lon_val = get_location_values()
-                sheet, _ = connect_sheet()
 
-                try:
-                    sheet.append_row([
-                        date_str,
-                        employee_clean,
-                        login_time_str,
-                        "",
-                        "",
-                        "In Progress",
-                        attendance_type,
-                        lat_val,
-                        lon_val,
-                        "",
-                        ""
-                    ])
-                    
-                    # Force cache invalidation so portal updates immediately
-                    st.cache_data.clear()
-                    st.success(f"✅ Login Recorded: {login_time_str}")
-                    st.rerun()
+                st.warning(
+                    f"⚠ {employee} has an approved leave for {date_str}.\n"
+                    "Admin override allowed."
+                )
 
-                except Exception as e:
-                    st.error(f"❌ Login insertion failed: {e}")
+        # ✅ LOCATION
+        lat, lon = get_location_values()
 
+        if lat is None:
+            lat = "NA"
 
-# --- LOGOUT ATTENDANCE ---
-with col2_act:
-    if st.button("🔴 Logout Attendance", key="logout_attendance_btn", use_container_width=True):
-        date_str = selected_date.strftime("%Y-%m-%d")
+        if lon is None:
+            lon = "NA"
+
+        # ✅ CONNECT SHEET
+        sheet, _ = connect_sheet()
+
+        # ✅ LOAD LATEST DATA
+        st.cache_data.clear()
+
+        df = load_attendance()
+
+        # ✅ CLEAN DATA (SAFE)
+        if df.empty:
+
+            df = pd.DataFrame(
+                columns=["Date", "Employee", "Logout"]
+            )
+
+        df.columns = df.columns.str.strip()
+
+        if "Employee" in df.columns:
+
+            df["Employee"] = (
+                df["Employee"]
+                .astype(str)
+                .str.strip()
+                .str.upper()
+            )
+
+        # ====================================================
+        # ✅ PREVENT DUPLICATE LOGIN
+        # ====================================================
+
+        existing_today = df[
+            (df["Date"] == date_str) &
+            (df["Employee"] == employee_clean)
+        ]
+
+        if not existing_today.empty:
+
+            last_logout = str(
+                existing_today.iloc[-1]["Logout"]
+            ).strip()
+
+            if last_logout in ["", "nan", "None"]:
+
+                st.warning(
+                    "⚠ Already logged in today"
+                )
+
+                st.stop()
+
+        # ====================================================
+        # ✅ SAVE LOGIN
+        # ====================================================
+
+        try:
+
+            sheet.append_row([
+                date_str,
+                employee,
+                login_time_str,
+                "",
+                "",
+                "In Progress",
+                attendance_type,
+                lat,
+                lon,
+                "",
+                ""
+            ])
+
+            st.success(
+                "✅ Row inserted into sheet"
+            )
+
+        except Exception as e:
+
+            st.error(
+                f"❌ Login failed: {e}"
+            )
+
+            st.stop()
+
+        # ✅ CLEAR CACHE
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+
+        # ✅ SUCCESS MESSAGE
+        st.success(
+            f"✅ Login Recorded Successfully\n"
+            f"⏰ {login_time_str} | 📍 {lat}, {lon}"
+        )
+
+        # ✅ REFRESH UI
+        st.rerun()
+
+with col2:
+    if st.button(
+        "🔴 Logout Attendance",
+        key="logout_attendance_btn"
+    ):
+
+        lat, lon = get_location_values()
+
+        sheet, _ = connect_sheet()
+
+        # ✅ Always load fresh data
+        st.cache_data.clear()
+
+        df = load_attendance()
+
+        df.columns = df.columns.str.strip()
+
+        df["Date"] = pd.to_datetime(
+            df["Date"],
+            errors="coerce"
+        ).dt.strftime("%Y-%m-%d")
+
+        # ✅ Normalize employee names
         employee_clean = str(employee).strip().upper()
 
-        # Force fresh sheet load to locate active row accurately
-        sheet, _ = connect_sheet()
-        all_rows = sheet.get_all_records()
+        df["Employee"] = (
+            df["Employee"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
 
-        if not all_rows:
-            st.warning("⚠ No records found in sheet.")
+        today_date = selected_date.strftime("%Y-%m-%d")
+
+        user_today = df[
+            (df["Date"] == today_date) &
+            (df["Employee"] == employee_clean)
+        ]
+
+        if user_today.empty:
+            st.warning("⚠ No login record found")
+            st.stop()
+
+        # ✅ Login record found
+        last_index = user_today.index[-1]
+
+        login_str = str(
+            user_today.iloc[-1]["Login"]
+        ).strip()
+
+        login_time = pd.to_datetime(
+            f"{today_date} {login_str}",
+            errors="coerce"
+        )
+
+        logout_time = pd.to_datetime(
+            get_ist(),
+            errors="coerce"
+        )
+
+        if pd.isna(login_time):
+            st.error("❌ Invalid login time")
+            st.stop()
+
+        if pd.isna(logout_time):
+            st.error("❌ Invalid logout time")
+            st.stop()
+
+        existing_logout = str(
+            user_today.iloc[-1]["Logout"]
+        ).strip()
+
+        if existing_logout not in ["", "nan", "None"]:
+            st.warning("⚠ Logout already completed")
+            st.stop()
+
+        try:
+            login_time = login_time.tz_localize(None)
+        except Exception:
+            pass
+
+        try:
+            logout_time = logout_time.tz_localize(None)
+        except Exception:
+            pass
+
+        # ✅ Handle overnight shift
+        if logout_time < login_time:
+            logout_time += pd.Timedelta(days=1)
+
+        time_diff = logout_time - login_time
+
+        total_hours = time_diff.total_seconds() / 3600
+
+        working_hours = str(time_diff).split(".")[0]
+
+        if total_hours >= 8:
+            status = "Full Day"
+        elif total_hours >= 4:
+            status = "Half Day"
         else:
-            # Find matching row index directly in Google Sheets (1-based index + header offset)
-            target_sheet_row = None
-            login_time_str = None
+            status = "Short Day"
 
-            for row_idx, r in enumerate(all_rows, start=2):  # Header is Row 1
-                r_date = str(r.get("Date", "")).strip()
-                r_emp = str(r.get("Employee", "")).strip().upper()
-                r_logout = str(r.get("Logout", "")).strip()
+        row_number = last_index + 2
 
-                if r_date == date_str and r_emp == employee_clean and r_logout in ["", "nan", "None", "Pending"]:
-                    target_sheet_row = row_idx
-                    login_time_str = str(r.get("Login", "")).strip()
-                    break
+        try:
 
-            if target_sheet_row is None:
-                st.warning("⚠ No active clock-in record found for today. Please clock in first.")
-            else:
-                logout_dt = get_ist()
-                login_dt = pd.to_datetime(f"{date_str} {login_time_str}", errors="coerce")
+            sheet.update_cell(
+                row_number,
+                4,
+                logout_time.strftime("%H:%M:%S")
+            )
 
-                if pd.isna(login_dt):
-                    st.error("❌ Invalid login time found in sheet.")
-                else:
-                    login_dt = login_dt.tz_localize(None)
-                    logout_dt = logout_dt.tz_localize(None)
+            sheet.update_cell(
+                row_number,
+                5,
+                working_hours
+            )
 
-                    if logout_dt < login_dt:
-                        logout_dt += pd.Timedelta(days=1)
+            sheet.update_cell(
+                row_number,
+                6,
+                status
+            )
 
-                    time_diff = logout_dt - login_dt
-                    total_hours = time_diff.total_seconds() / 3600
-                    working_hours = str(time_diff).split(".")[0]
+            sheet.update_cell(
+                row_number,
+                10,
+                lat
+            )
 
-                    if total_hours >= 8:
-                        status = "Full Day"
-                    elif total_hours >= 4:
-                        status = "Half Day"
-                    else:
-                        status = "Short Day"
+            sheet.update_cell(
+                row_number,
+                11,
+                lon
+            )
 
-                    lat_val, lon_val = get_location_values()
+            st.cache_data.clear()
 
-                    try:
-                        # Direct cell updates on verified row index
-                        sheet.update_cell(target_sheet_row, 4, logout_dt.strftime("%H:%M:%S"))
-                        sheet.update_cell(target_sheet_row, 5, working_hours)
-                        sheet.update_cell(target_sheet_row, 6, status)
-                        sheet.update_cell(target_sheet_row, 10, lat_val)
-                        sheet.update_cell(target_sheet_row, 11, lon_val)
+            st.success(
+                f"""✅ Logout Recorded Successfully
 
-                        # Clear cache and refresh app state
-                        st.cache_data.clear()
-                        st.success(f"✅ Logout Recorded! Hours: {working_hours} | Status: {status}")
-                        st.rerun()
+📍 Location: {lat}, {lon}
+⏱ Hours: {working_hours}
+📌 Status: {status}
+"""
+            )
 
-                    except Exception as e:
-                        st.error(f"❌ Sheet update failed: {e}")
+            st.rerun()
+
+        except Exception as e:
+
+            st.error(
+                f"❌ Sheet update failed: {e}"
+            )
+
+            st.stop()
+# ============================================================
+# ✅ TODAY'S ATTENDANCE
+# ============================================================
+
+st.subheader("📋 Today's Attendance")
+
+df_today = load_attendance()
+
+df_today.columns = df_today.columns.str.strip()
+
+df_today["Date"] = pd.to_datetime(
+    df_today["Date"],
+    errors="coerce"
+).dt.strftime("%Y-%m-%d")
+
+today_date = date.today().strftime("%Y-%m-%d")
+if role == "admin":
+
+    today_data = df_today[
+        df_today["Date"] == today_date
+    ]
+
+else:
+
+    today_data = df_today[
+        (df_today["Date"] == today_date) &
+        (df_today["Employee"] == employee)
+    ]
+
+if not today_data.empty:
+
+    display_df = today_data.copy()
+
+    display_df["Login"] = pd.to_datetime(
+        display_df["Login"],
+        errors="coerce"
+    ).dt.strftime("%H:%M:%S")
+
+    display_df["Logout"] = pd.to_datetime(
+        display_df["Logout"],
+        errors="coerce"
+    ).dt.strftime("%H:%M:%S")
+
+    display_df["Logout"] = display_df[
+        "Logout"
+    ].fillna("Pending")
+
+    display_df = display_df.reset_index(drop=True)
+
+    display_df.insert(
+        0,
+        "S.No",
+        range(1, len(display_df) + 1)
+    )
+
+    st.dataframe(
+        display_df[
+            [
+                "S.No",
+                "Employee",
+                "Login",
+                "Logout",
+                "Working Hours",
+                "Status",
+                "Type",
+                "Login Latitude",
+                "Login Longitude",
+                "Logout Latitude",
+                "Logout Longitude"
+
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True
+    )
+
+# ============================================================
+# ✅ ADMIN CONTROLS
+# ============================================================
+
+st.divider()
+
+if role == "admin":
+
+    st.markdown("### ⚠️ Admin Controls")
+
+    # ========================================================
+    # ✅ CLEAR ATTENDANCE
+    # ========================================================
+
+    confirm_clear = st.checkbox(
+        "Confirm Clear Attendance",
+        key="confirm_clear_attendance"
+    )
+
+    if confirm_clear:
+
+        if st.button(
+            "🧹 Clear Attendance",
+            key="clear_attendance_btn"
+        ):
+
+            try:
+
+                sheet, _ = connect_sheet()
+
+                sheet.clear()
+
+                sheet.append_row([
+                    "Date",
+                    "Employee",
+                    "Login",
+                    "Logout",
+                    "Working Hours",
+                    "Status",
+                    "Type",
+                    "Login Latitude",
+                    "Login Longitude",
+                    "Logout Latitude",
+                    "Logout Longitude"
+                ])
+
+                try:
+                    st.cache_data.clear()
+                except Exception:
+                    pass
+
+                st.success(
+                    "✅ Attendance Cleared Successfully"
+                )
+
+                st.rerun()
+
+            except Exception as e:
+                st.error(
+                    f"❌ Error clearing attendance: {e}"
+                )
 
     # ========================================================
     # ✅ REMOVE DUPLICATE ENTRIES
@@ -288,7 +924,7 @@ with col2_act:
             )
 
             try:
-                load_attendance.clear()
+                st.cache_data.clear()
             except Exception:
                 pass
 
@@ -303,7 +939,6 @@ with col2_act:
             st.error(
                 f"❌ Error removing duplicates: {e}"
             )
-
 # ============================================================
 # ✅ LEAVE MANAGEMENT
 # ============================================================
@@ -377,8 +1012,11 @@ if role == "employee":
 
                     added = True
 
+            st.cache_data.clear()
+
             if added:
                 st.success("✅ Leave Submitted")
+                st.rerun()
 
             else:
                 st.warning("⚠ Leave Already Applied")
@@ -388,7 +1026,8 @@ if role == "employee":
     leave_df = load_leave()
 
     st.dataframe(
-        leave_df[leave_df["Employee"] == employee_clean]
+        leave_df[leave_df["Employee"] == employee_clean],
+        use_container_width=True
     )
 
 # ============================================================
@@ -448,6 +1087,8 @@ if role == "admin":
                         ""
                     ])
 
+                    st.cache_data.clear()
+
                     st.success("✅ Leave Approved")
 
                     st.rerun()
@@ -466,12 +1107,14 @@ if role == "admin":
                         "Rejected"
                     )
 
+                    st.cache_data.clear()
+
                     st.warning("❌ Leave Rejected")
 
                     st.rerun()
 
 # ============================================================
-# ✅ ATTENDANCE RECORDS
+# ✅ ATTENDANCE RECORDS & DASHBOARD
 # ============================================================
 st.subheader("📋 Attendance Records")
 
@@ -558,69 +1201,8 @@ if "Working Hours" in df.columns:
 else:
     st.info("No attendance records found")
 
-
-# ✅ Employee filter with col2:
-employee_list = ["All"] + sorted(df["Employee"].dropna().astype(str).unique())
-
-selected_employee = st.selectbox(
-    "👤 Select Employee",
-    employee_list,
-    key="employee_filter_top"
-)
-
 # ========================================================
-# ✅ FILTERS (FIXED ALIGNMENT)
-# ========================================================
-
-col1_flt, col2_flt = st.columns(2)
-
-with col1_flt:
-    months = ["All"] + sorted(df["Month"].dropna().unique())
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        months,
-        key="month_filter_top"
-    )
-
-with col2_flt:
-    employee_list = ["All"] + sorted(
-        df["Employee"].dropna().astype(str).unique()
-    )
-
-    selected_employee = st.selectbox(
-        "👤 Select Employee",
-        employee_list,
-        key="employee_filter_bottom"
-    )
-
-# ✅ Load data (IMPORTANT ✅)
-df = load_attendance()
-
-df.columns = df.columns.str.strip()
-
-df["Date"] = pd.to_datetime(
-    df["Date"],
-    errors="coerce"
-).dt.strftime("%Y-%m-%d")
-
-# ✅ Check if data exists
-if df.empty:
-    st.info("⚠ No attendance data found")
-    st.stop()
-
-# ✅ Ensure Date column exists
-if "Date" not in df.columns:
-    st.error("❌ Date column missing in data")
-    st.stop()
-
-# ✅ Create Month column
-df["Month"] = pd.to_datetime(
-    df["Date"],
-    errors="coerce"
-).dt.strftime("%Y-%m")
-
-# ========================================================
-# ✅ FILTERS
+# ✅ FILTERS & SELECTIONS
 # ========================================================
 
 col1_mflt, col2_mflt = st.columns(2)
@@ -667,7 +1249,7 @@ if selected_employee != "All":
     ]
 monthly_df = monthly_df.copy()
 
-# ✅ ✅ ADD YOUR FIXES HERE ✅
+# ✅ ✅ ADD FIXES HERE ✅
 monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
 monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
 
@@ -786,6 +1368,7 @@ if not monthly_df.empty:
 
 else:
     st.info("⚠ No data available for selected month")
+
 # ============================================================
 # ✅ FULL DOWNLOAD (ALL DATA)
 # ============================================================
