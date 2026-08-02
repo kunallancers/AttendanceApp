@@ -17,7 +17,6 @@ st.set_page_config(
     page_title="Attendance Management System",
     layout="wide"
 )
-
 # ============================================================
 # ✅ APP STYLING (BACKGROUND + UI)
 # ============================================================
@@ -73,8 +72,6 @@ def connect_sheet():
         st.error("❌ Google Sheet connection failed")
         st.error(str(e))  # optional debug
         st.stop()
-
-
 # ============================================================
 # ✅ IST TIME
 # ============================================================
@@ -83,43 +80,57 @@ def get_ist():
     return pd.Timestamp.now(
         tz="Asia/Kolkata"
     ).tz_localize(None)
-
-
 # ============================================================
-# ✅ LOAD ATTENDANCE (FIXED DATE PARSING FOR END OF MONTH)
+# ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
 # ============================================================
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=1)
 def load_attendance():
 
-    df = pd.DataFrame()
+    df = pd.DataFrame()   # ✅ ALWAYS DEFINE FIRST (CRITICAL FIX)
 
     try:
         sheet, _ = connect_sheet()
+
         data = sheet.get_all_records()
 
+        # ✅ EMPTY SHEET
         if not data:
             return pd.DataFrame(columns=[
-                "Date", "Employee", "Login", "Logout", "Working Hours",
-                "Status", "Type", "Login Latitude", "Login Longitude",
-                "Logout Latitude", "Logout Longitude"
+                "Date",
+                "Employee",
+                "Login",
+                "Logout",
+                "Working Hours",
+                "Status",
+                "Type",
+                "Login Latitude",
+                "Login Longitude",
+                "Logout Latitude",
+                "Logout Longitude"
             ])
 
+        # ✅ CREATE DF
         df = pd.DataFrame(data)
+
+        # ✅ CLEAN COLUMNS
         df.columns = df.columns.str.strip()
 
+        # ✅ CHECK REQUIRED COLUMN
         if "Date" not in df.columns:
             st.error("❌ 'Date' column missing in sheet")
             return pd.DataFrame()
 
-        # ✅ CRITICAL FIX: dayfirst=True & format='mixed' ensures dates like 30/07/2026 or 31-07-2026 don't get turned into NaT
+        # ✅ CLEAN DATA
         df["Date"] = pd.to_datetime(
             df["Date"], dayfirst=True, format="mixed", errors="coerce"
         )
 
         df = df.dropna(subset=["Date"])
+
         df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
 
+        # ✅ CLEAN EMPLOYEE
         if "Employee" in df.columns:
             df["Employee"] = (
                 df["Employee"]
@@ -128,12 +139,11 @@ def load_attendance():
                 .str.upper()
             )
 
-        return df
+        return df   # ✅ ALWAYS SAFE
 
     except Exception as e:
         st.error(f"❌ Error loading attendance: {e}")
-        return df
-
+        return df   # ✅ RETURN SAFE EMPTY DF (FIX)
 # ============================================================
 # ✅ LOAD LEAVE (SAFE VERSION ✅ PLACE HERE)
 # ============================================================
@@ -155,6 +165,11 @@ def load_leave():
         df = pd.DataFrame(data)
         df.columns = df.columns.str.strip()
 
+        if "Date" in df.columns:
+            df["Date"] = pd.to_datetime(
+                df["Date"], dayfirst=True, format="mixed", errors="coerce"
+            ).dt.strftime("%Y-%m-%d")
+
         # ✅ Normalize employee name
         if "Employee" in df.columns:
             df["Employee"] = (
@@ -169,7 +184,6 @@ def load_leave():
     except Exception as e:
         st.error(f"❌ Error loading leave: {e}")
         return pd.DataFrame()
-
 
 # ✅ ALWAYS LOAD FRESH DATA AFTER CALL
 df = load_attendance()
@@ -235,19 +249,22 @@ if not st.session_state["logged_in"]:
         key="auth_login_pass"
     )
 
-    if st.button("🔑 Login", key="login_btn_auth"):
+    st.button(
+        "🔑 Login",
+        key="login_btn"
+    )
 
-        if (username in users and users[username]["password"] == password):
+    if (username in users and users[username]["password"] == password):
 
-            st.session_state["logged_in"] = True
-            st.session_state["role"] = users[username]["role"]
-            st.session_state["employee"] = users[username]["employee"]
+        st.session_state["logged_in"] = True
+        st.session_state["role"] = users[username]["role"]
+        st.session_state["employee"] = users[username]["employee"]
 
-            st.rerun()
+        st.rerun()
 
-        else:
+    else:
 
-            st.error("❌ Invalid Credentials")
+        st.error("❌ Invalid Credentials")
 
     st.stop()
 
@@ -279,7 +296,6 @@ with col1:
 # ✅ LOCATION INITIALIZATION + FETCH
 # ============================================================
 
-
 if "location" not in st.session_state:
     st.session_state["location"] = {}
 
@@ -303,7 +319,6 @@ def get_location_values():
     lon = loc.get("lon") or "NA"
 
     return lat, lon
-
 
 # ============================================================
 # ✅ STEP 3: DISPLAY LOCATION
@@ -583,7 +598,7 @@ with col2:
 
         df["Date"] = pd.to_datetime(
             df["Date"],
-            errors="coerce"
+            dayfirst=True, format="mixed", errors="coerce"
         ).dt.strftime("%Y-%m-%d")
 
         # ✅ Normalize employee names
@@ -731,11 +746,6 @@ df_today = load_attendance()
 
 df_today.columns = df_today.columns.str.strip()
 
-df_today["Date"] = pd.to_datetime(
-    df_today["Date"],
-    errors="coerce"
-).dt.strftime("%Y-%m-%d")
-
 today_date = date.today().strftime("%Y-%m-%d")
 if role == "admin":
 
@@ -747,7 +757,7 @@ else:
 
     today_data = df_today[
         (df_today["Date"] == today_date) &
-        (df_today["Employee"] == employee)
+        (df_today["Employee"] == str(employee).strip().upper())
     ]
 
 if not today_data.empty:
@@ -887,7 +897,7 @@ if role == "admin":
 
             df["Date"] = pd.to_datetime(
                 df["Date"],
-                errors="coerce"
+                dayfirst=True, format="mixed", errors="coerce"
             ).dt.strftime("%Y-%m-%d")
 
             # Remove only truly identical rows
@@ -980,7 +990,7 @@ if role == "employee":
                 d_str = d.strftime("%Y-%m-%d")
 
                 duplicate = leave_df[
-                    (leave_df["Employee"] == employee) &
+                    (leave_df["Employee"] == employee_clean) &
                     (leave_df["Date"] == d_str)
                 ]
 
@@ -1009,8 +1019,7 @@ if role == "employee":
     leave_df = load_leave()
 
     st.dataframe(
-        leave_df[leave_df["Employee"] == employee_clean],
-        use_container_width=True
+        leave_df[leave_df["Employee"] == employee_clean]
     )
 
 # ============================================================
@@ -1105,11 +1114,6 @@ df = load_attendance()
 
 df.columns = df.columns.str.strip()
 
-df["Date"] = pd.to_datetime(
-    df["Date"],
-    errors="coerce"
-).dt.strftime("%Y-%m-%d")
-
 # ✅ ADD THIS
 df["Month"] = pd.to_datetime(
     df["Date"],
@@ -1185,7 +1189,32 @@ else:
     st.info("No attendance records found")
 
 # ========================================================
-# ✅ FILTERS & SELECTIONS
+# ✅ FILTERS (FIXED ALIGNMENT)
+# ========================================================
+
+col1_flt, col2_flt = st.columns(2)
+
+with col1_flt:
+    months = ["All"] + sorted(df["Month"].dropna().unique())
+    selected_month = st.selectbox(
+        "📅 Select Month",
+        months,
+        key="month_filter_top"
+    )
+
+with col2_flt:
+    employee_list = ["All"] + sorted(
+        df["Employee"].dropna().astype(str).unique()
+    )
+
+    selected_employee = st.selectbox(
+        "👤 Select Employee",
+        employee_list,
+        key="employee_filter_bottom"
+    )
+
+# ========================================================
+# ✅ FILTERS
 # ========================================================
 
 col1_mflt, col2_mflt = st.columns(2)
@@ -1232,7 +1261,7 @@ if selected_employee != "All":
     ]
 monthly_df = monthly_df.copy()
 
-# ✅ ✅ ADD FIXES HERE ✅
+# ✅ ✅ ADD YOUR FIXES HERE ✅
 monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
 monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
 
@@ -1289,18 +1318,19 @@ with col5_kpi:
 st.divider()
 
 # ============================================================
-# ✅ TABLE + DOWNLOAD (CALENDAR BOUNDS ALLOW TODAY / END OF MONTH)
+# ✅ TABLE + DOWNLOAD (WITH INTERACTIVE CALENDAR FILTER)
 # ============================================================
 
 if not monthly_df.empty:
 
     st.markdown("### 📅 Attendance Details")
 
+    # Convert date strings in monthly_df to actual date objects for calendar bounds
     monthly_dates = pd.to_datetime(monthly_df["Date"]).dt.date
     min_month_date = monthly_dates.min()
-    # Set max bound to at least today so 30/31 July are selectable
     max_month_date = max(monthly_dates.max(), date.today())
 
+    # Toggle to choose between All Dates or Specific Calendar Date
     col_cal1, col_cal2 = st.columns([1, 2])
 
     with col_cal1:
@@ -1324,16 +1354,19 @@ if not monthly_df.empty:
         else:
             date_str_filter = None
 
+    # Filter display DataFrame based on calendar selection
     if date_str_filter:
         display_df = monthly_df[monthly_df["Date"] == date_str_filter]
     else:
         display_df = monthly_df.copy()
 
+    # ✅ Display Table
     if not display_df.empty:
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
         st.divider()
 
+        # ✅ Download filtered report
         file_suffix = date_str_filter if date_str_filter else selected_month
         st.download_button(
             label="⬇ Download Selected Report",
