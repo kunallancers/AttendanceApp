@@ -761,7 +761,32 @@ df_today = load_attendance()
 
 df_today.columns = df_today.columns.str.strip()
 
+# ✅ Normalize employee names
+if "Employee" in df_today.columns:
+
+    df_today["Employee"] = (
+        df_today["Employee"]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
 today_date = selected_date.strftime("%Y-%m-%d")
+
+# ✅ Temporary Debug
+st.write("Selected Date:", today_date)
+
+st.write("Attendance Rows:", len(df_today))
+
+st.dataframe(
+    df_today[
+        ["Date", "Employee"]
+    ].tail(20),
+    hide_index=True
+)
+
+employee_clean = str(employee).strip().upper()
+
 if role == "admin":
 
     today_data = df_today[
@@ -772,7 +797,7 @@ else:
 
     today_data = df_today[
         (df_today["Date"] == today_date) &
-        (df_today["Employee"] == str(employee).strip().upper())
+        (df_today["Employee"] == employee_clean)
     ]
 
 if not today_data.empty:
@@ -789,9 +814,10 @@ if not today_data.empty:
         errors="coerce"
     ).dt.strftime("%H:%M:%S")
 
-    display_df["Logout"] = display_df[
-        "Logout"
-    ].fillna("Pending")
+    display_df["Logout"] = (
+        display_df["Logout"]
+        .fillna("Pending")
+    )
 
     display_df = display_df.reset_index(drop=True)
 
@@ -815,12 +841,15 @@ if not today_data.empty:
                 "Login Longitude",
                 "Logout Latitude",
                 "Logout Longitude"
-
             ]
         ],
         use_container_width=True,
         hide_index=True
     )
+
+else:
+
+    st.info("No attendance recorded for selected date.")
 
 # ============================================================
 # ✅ ADMIN CONTROLS
