@@ -193,6 +193,11 @@ df = load_attendance()
 # ============================================================
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
+if "role" not in st.session_state:
+    st.session_state["role"] = ""
+
+if "employee" not in st.session_state:
+    st.session_state["employee"] = ""
 
 # ============================================================
 # ✅ LOAD EMPLOYEE FILE
@@ -237,11 +242,15 @@ for _, row in df_emp.iterrows():
 # ============================================================
 # ✅ LOGIN PAGE
 # ============================================================
+
 if not st.session_state["logged_in"]:
 
     st.title("🔐 Login")
 
-    username = st.text_input("Username", key="auth_login_user")
+    username = st.text_input(
+        "Username",
+        key="auth_login_user"
+    )
 
     password = st.text_input(
         "Password",
@@ -249,25 +258,27 @@ if not st.session_state["logged_in"]:
         key="auth_login_pass"
     )
 
-    st.button(
+    if st.button(
         "🔑 Login",
         key="login_btn"
-    )
-
-    if (
-        username in users 
-        and users[username]["password"] == password
     ):
 
-        st.session_state["logged_in"] = True
-        st.session_state["role"] = users[username]["role"]
-        st.session_state["employee"] = users[username]["employee"]
+        if (
+            username in users
+            and users[username]["password"] == password
+        ):
 
-        st.rerun()
+            st.session_state["logged_in"] = True
+            st.session_state["role"] = users[username]["role"]
+            st.session_state["employee"] = users[username]["employee"]
 
-    else:
+            st.rerun()
 
-        st.error("❌ Invalid Credentials")
+        else:
+
+            st.error("❌ Invalid Credentials")
+
+    st.stop()
 
 # ============================================================
 # ✅ LOGOUT
@@ -278,9 +289,12 @@ if st.button("Logout", key="main_app_logout_btn"):
 
     st.rerun()
 
-role = st.session_state["role"]
+role = st.session_state.get("role", "")
 
-employee = st.session_state["employee"]
+employee = st.session_state.get(
+    "employee",
+    ""
+)
 
 # ✅ ADD THIS
 ADMIN_USERS = ["ADMIN"]
