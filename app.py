@@ -1289,64 +1289,64 @@ with col5_kpi:
 st.divider()
 
 # ============================================================
-    # ✅ TABLE + DOWNLOAD (CALENDAR BOUNDS ALLOW TODAY / END OF MONTH)
-    # ============================================================
+# ✅ TABLE + DOWNLOAD (CALENDAR BOUNDS ALLOW TODAY / END OF MONTH)
+# ============================================================
 
-    if not monthly_df.empty:
+if not monthly_df.empty:
 
-        st.markdown("### 📅 Attendance Details")
+    st.markdown("### 📅 Attendance Details")
 
-        monthly_dates = pd.to_datetime(monthly_df["Date"]).dt.date
-        min_month_date = monthly_dates.min()
-        # Set max bound to at least today so 30/31 July are selectable
-        max_month_date = max(monthly_dates.max(), date.today())
+    monthly_dates = pd.to_datetime(monthly_df["Date"]).dt.date
+    min_month_date = monthly_dates.min()
+    # Set max bound to at least today so 30/31 July are selectable
+    max_month_date = max(monthly_dates.max(), date.today())
 
-        col_cal1, col_cal2 = st.columns([1, 2])
+    col_cal1, col_cal2 = st.columns([1, 2])
 
-        with col_cal1:
-            filter_mode = st.radio(
-                "Filter View",
-                ["All Dates in Month", "Specific Date"],
-                horizontal=True,
-                key="details_date_filter_mode"
+    with col_cal1:
+        filter_mode = st.radio(
+            "Filter View",
+            ["All Dates in Month", "Specific Date"],
+            horizontal=True,
+            key="details_date_filter_mode"
+        )
+
+    with col_cal2:
+        if filter_mode == "Specific Date":
+            selected_calendar_date = st.date_input(
+                "📅 Select Date from Calendar",
+                value=date.today(),
+                min_value=min_month_date,
+                max_value=max_month_date,
+                key="attendance_details_calendar"
             )
-
-        with col_cal2:
-            if filter_mode == "Specific Date":
-                selected_calendar_date = st.date_input(
-                    "📅 Select Date from Calendar",
-                    value=date.today(),
-                    min_value=min_month_date,
-                    max_value=max_month_date,
-                    key="attendance_details_calendar"
-                )
-                date_str_filter = selected_calendar_date.strftime("%Y-%m-%d")
-            else:
-                date_str_filter = None
-
-        if date_str_filter:
-            display_df = monthly_df[monthly_df["Date"] == date_str_filter]
+            date_str_filter = selected_calendar_date.strftime("%Y-%m-%d")
         else:
-            display_df = monthly_df.copy()
+            date_str_filter = None
 
-        if not display_df.empty:
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-            st.divider()
-
-            file_suffix = date_str_filter if date_str_filter else selected_month
-            st.download_button(
-                label="⬇ Download Selected Report",
-                data=display_df.to_csv(index=False).encode("utf-8"),
-                file_name=f"attendance_report_{file_suffix}.csv",
-                mime="text/csv",
-                key="download_monthly_report_btn"
-            )
-        else:
-            st.info(f"⚠ No attendance records found for {date_str_filter}")
-
+    if date_str_filter:
+        display_df = monthly_df[monthly_df["Date"] == date_str_filter]
     else:
-        st.info("⚠ No data available for selected month")
+        display_df = monthly_df.copy()
+
+    if not display_df.empty:
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        file_suffix = date_str_filter if date_str_filter else selected_month
+        st.download_button(
+            label="⬇ Download Selected Report",
+            data=display_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"attendance_report_{file_suffix}.csv",
+            mime="text/csv",
+            key="download_monthly_report_btn"
+        )
+    else:
+        st.info(f"⚠ No attendance records found for {date_str_filter}")
+
+else:
+    st.info("⚠ No data available for selected month")
 
 # ============================================================
 # ✅ FULL DOWNLOAD (ALL DATA)
