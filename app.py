@@ -254,7 +254,10 @@ if not st.session_state["logged_in"]:
         key="login_btn"
     )
 
-    if (username in users and users[username]["password"] == password):
+    if (
+        username in users 
+        and users[username]["password"] == password
+    ):
 
         st.session_state["logged_in"] = True
         st.session_state["role"] = users[username]["role"]
@@ -265,8 +268,6 @@ if not st.session_state["logged_in"]:
     else:
 
         st.error("❌ Invalid Credentials")
-
-    st.stop()
 
 # ============================================================
 # ✅ LOGOUT
@@ -746,7 +747,7 @@ df_today = load_attendance()
 
 df_today.columns = df_today.columns.str.strip()
 
-today_date = date.today().strftime("%Y-%m-%d")
+today_date = selected_date.strftime("%Y-%m-%d")
 if role == "admin":
 
     today_data = df_today[
@@ -1164,8 +1165,10 @@ if not df.empty:
     # ========================================================
     if role == "employee":
 
+        employee_clean = str(employee).strip().upper()
+
         df = df[
-            df["Employee"] == employee
+            df["Employee"] == employee_clean
         ]
 
     # ========================================================
@@ -1187,31 +1190,6 @@ if "Working Hours" in df.columns:
 
 else:
     st.info("No attendance records found")
-
-# ========================================================
-# ✅ FILTERS (FIXED ALIGNMENT)
-# ========================================================
-
-col1_flt, col2_flt = st.columns(2)
-
-with col1_flt:
-    months = ["All"] + sorted(df["Month"].dropna().unique())
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        months,
-        key="month_filter_top"
-    )
-
-with col2_flt:
-    employee_list = ["All"] + sorted(
-        df["Employee"].dropna().astype(str).unique()
-    )
-
-    selected_employee = st.selectbox(
-        "👤 Select Employee",
-        employee_list,
-        key="employee_filter_bottom"
-    )
 
 # ========================================================
 # ✅ FILTERS
@@ -1384,8 +1362,9 @@ else:
 # ============================================================
 # ✅ FULL DOWNLOAD (ALL DATA)
 # ============================================================
-
-st.markdown("### 📥 Download Full Data")
+if role == "admin"
+    
+    st.markdown("### 📥 Download Full Data")
 
 st.download_button(
     label="📥 Download Full Attendance",
