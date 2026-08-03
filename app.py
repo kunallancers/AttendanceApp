@@ -752,31 +752,31 @@ with col2:
 
             st.stop()
 # ============================================================
-# ✅ TODAY'S ATTENDANCE
+# ✅ TODAY'S ATTENDANCE (UPDATED & FIXED VERSION)
 # ============================================================
 
 st.subheader("📋 Today's Attendance")
 
-# ✅ Always load latest attendance
-load_attendance.clear()
+# ✅ Always clear cache & pull fresh data from Google Sheet
+st.cache_data.clear()
 
 df_today = load_attendance()
 
 if df_today.empty:
     st.info("No attendance recorded today.")
 else:
-
     df_today.columns = df_today.columns.str.strip()
 
-    # ✅ Normalize Date
+    # ✅ Robust Date Normalization (handles DD-MM-YYYY, YYYY/MM/DD, YYYY-MM-DD)
     df_today["Date"] = pd.to_datetime(
         df_today["Date"],
+        dayfirst=True,
+        format="mixed",
         errors="coerce"
     ).dt.strftime("%Y-%m-%d")
 
-    # ✅ Normalize Employee
+    # ✅ Clean & Normalize Employee column
     if "Employee" in df_today.columns:
-
         df_today["Employee"] = (
             df_today["Employee"]
             .astype(str)
@@ -784,75 +784,53 @@ else:
             .str.upper()
         )
 
-    today_date = selected_date.strftime("%Y-%m-%d")
+    # ✅ Selected date formatted explicitly as YYYY-MM-DD
+    today_date = pd.to_datetime(selected_date).strftime("%Y-%m-%d")
 
-    employee_clean = str(employee).strip().upper()
+    # ✅ Fetch active target employee
+    target_emp = active_employee if 'active_employee' in locals() else employee
+    employee_clean = str(target_emp).strip().upper()
 
+    # Filter data
     if role == "admin":
-
-        today_data = df_today[
-            df_today["Date"] == today_date
-        ]
-
+        today_data = df_today[df_today["Date"] == today_date]
     else:
-
         today_data = df_today[
             (df_today["Date"] == today_date) &
             (df_today["Employee"] == employee_clean)
         ]
 
     if not today_data.empty:
-
         display_df = today_data.copy()
 
+        # Format Login / Logout times cleanly
         display_df["Login"] = pd.to_datetime(
-            display_df["Login"],
-            errors="coerce"
-        ).dt.strftime("%H:%M:%S")
+            display_df["Login"], errors="coerce"
+        ).dt.strftime("%H:%M:%S").fillna(display_df["Login"])
 
         display_df["Logout"] = pd.to_datetime(
-            display_df["Logout"],
-            errors="coerce"
+            display_df["Logout"], errors="coerce"
         ).dt.strftime("%H:%M:%S")
 
-        display_df["Logout"] = (
-            display_df["Logout"]
-            .fillna("Pending")
-        )
+        display_df["Logout"] = display_df["Logout"].fillna("Pending")
 
         display_df = display_df.reset_index(drop=True)
+        display_df.insert(0, "S.No", range(1, len(display_df) + 1))
 
-        display_df.insert(
-            0,
-            "S.No",
-            range(1, len(display_df) + 1)
-        )
+        # Show only existing columns safely
+        show_cols = [col for col in [
+            "S.No", "Employee", "Login", "Logout", "Working Hours",
+            "Status", "Type", "Login Latitude", "Login Longitude",
+            "Logout Latitude", "Logout Longitude"
+        ] if col in display_df.columns]
 
         st.dataframe(
-            display_df[
-                [
-                    "S.No",
-                    "Employee",
-                    "Login",
-                    "Logout",
-                    "Working Hours",
-                    "Status",
-                    "Type",
-                    "Login Latitude",
-                    "Login Longitude",
-                    "Logout Latitude",
-                    "Logout Longitude"
-                ]
-            ],
+            display_df[show_cols],
             use_container_width=True,
             hide_index=True
         )
-
     else:
-
-        st.info(
-            "No attendance recorded for selected date."
-        )
+        st.info("No attendance recorded for selected date.")
 
 # ============================================================
 # ✅ ADMIN CONTROLS
