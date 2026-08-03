@@ -1327,85 +1327,88 @@ if not monthly_df.empty:
 
     st.markdown("### 📅 Attendance Details")
 
-    # ✅ Safe date parsing with format handling
-    monthly_dates = pd.to_datetime(
-        monthly_df["Date"], 
+    # ✅ Safe date normalization across all records
+    monthly_df_clean = monthly_df.copy()
+    monthly_df_clean["Date_Parsed"] = pd.to_datetime(
+        monthly_df_clean["Date"], 
         dayfirst=True, 
         format="mixed", 
         errors="coerce"
-    ).dt.date.dropna()
+    )
+    
+    # Drop invalid/NaT dates
+    monthly_df_clean = monthly_df_clean.dropna(subset=["Date_Parsed"])
+    monthly_df_clean["Date"] = monthly_df_clean["Date_Parsed"].dt.strftime("%Y-%m-%d")
 
-    if not monthly_dates.empty:
-        min_month_date = monthly_dates.min()
-        max_month_date = monthly_dates.max()
+    # ✅ Determine full month range bounds (First day to Last day of the selected month)
+    selected_yr_m = pd.to_datetime(selected_month, format="%Y-%m")
+    min_month_date = selected_yr_m.date().replace(day=1)
+    
+    # Calculate last day of the selected month
+    next_month = selected_yr_m + pd.DateOffset(months=1)
+    max_month_date = (next_month - pd.DateOffset(days=1)).date()
 
-        # ✅ Clamp default calendar date safely inside min/max bounds
-        today_curr = date.today()
-        if today_curr < min_month_date:
-            default_cal_val = min_month_date
-        elif today_curr > max_month_date:
-            default_cal_val = max_month_date
-        else:
-            default_cal_val = today_curr
+    # Toggle between All Dates in Month or Specific Date
+    col_cal1, col_cal2 = st.columns([1, 2])
 
-        # Toggle to choose between All Dates or Specific Calendar Date
-        col_cal1, col_cal2 = st.columns([1, 2])
+    with col_cal1:
+        filter_mode = st.radio(
+            "Filter View",
+            ["All Dates in Month", "Specific Date"],
+            horizontal=True,
+            key="details_date_filter_mode"
+        )
 
-        with col_cal1:
-            filter_mode = st.radio(
-                "Filter View",
-                ["All Dates in Month", "Specific Date"],
-                horizontal=True,
-                key="details_date_filter_mode"
-            )
-
-        with col_cal2:
-            if filter_mode == "Specific Date":
-                selected_calendar_date = st.date_input(
-                    "📅 Select Date from Calendar",
-                    value=default_cal_val,
-                    min_value=min_month_date,
-                    max_value=max_month_date,
-                    key="attendance_details_calendar"
-                )
-                date_str_filter = selected_calendar_date.strftime("%Y-%m-%d")
+    with col_cal2:
+        if filter_mode == "Specific Date":
+            # Default picker value constrained within month bounds
+            today_curr = date.today()
+            if min_month_date <= today_curr <= max_month_date:
+                default_cal_val = today_curr
             else:
-                date_str_filter = None
+                default_cal_val = min_month_date
 
-        # ✅ Ensure monthly_df['Date'] is standardized for exact string matching
-        monthly_df_clean = monthly_df.copy()
-        monthly_df_clean["Date"] = pd.to_datetime(
-            monthly_df_clean["Date"], 
-            dayfirst=True, 
-            format="mixed", 
-            errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
-
-        # Filter display DataFrame based on calendar selection
-        if date_str_filter:
-            display_df = monthly_df_clean[monthly_df_clean["Date"] == date_str_filter]
-        else:
-            display_df = monthly_df_clean.copy()
-
-        # ✅ Display Table
-        if not display_df.empty:
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-            st.divider()
-
-            # ✅ Download filtered report
-            file_suffix = date_str_filter if date_str_filter else selected_month
-            st.download_button(
-                label="⬇ Download Selected Report",
-                data=display_df.to_csv(index=False).encode("utf-8"),
-                file_name=f"attendance_report_{file_suffix}.csv",
-                mime="text/csv",
-                key="download_monthly_report_btn"
+            selected_calendar_date = st.date_input(
+                "📅 Select Date from Calendar",
+                value=default_cal_val,
+                min_value=min_month_date,
+                max_value=max_month_date,
+                key="attendance_details_calendar"
             )
+            date_str_filter = selected_calendar_date.strftime("%Y-%m-%d")
         else:
-            st.info(f"⚠ No attendance records found for {date_str_filter}")
+            date_str_filter = None
+
+    # ✅ Apply Date Filter (if specific date selected)
+    if date_str_filter:
+        display_df = monthly_df_clean[monthly_df_clean["Date"] == date_str_filter].copy()
     else:
-        st.warning("⚠ Invalid or missing date records found for selected month.")
+        display_df = monthly_df_clean.copy()
+
+    # Drop temporary parsing column before rendering table
+    if "Date_Parsed" in display_df.columns:
+        display_df = display_df.drop(columns=["Date_Parsed"])
+
+    # ✅ Display Table
+    if not display_df.empty:
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # ✅ Download filtered report
+        file_suffix = date_str_filter if date_str_filter else selected_month
+        st.download_button(
+            label="⬇ Download Selected Report",
+            data=display_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"attendance_report_{file_suffix}.csv",
+            mime="text/csv",
+            key="download_monthly_report_btn"
+        )
+    else:
+        if date_str_filter:
+            st.info(f"⚠ No attendance records found for {date_str_filter}")
+        else:
+            st.info("⚠ No attendance records found for selected filters.")
 
 else:
     st.info("⚠ No data available for selected month")
