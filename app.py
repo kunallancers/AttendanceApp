@@ -773,18 +773,6 @@ if "Employee" in df_today.columns:
 
 today_date = selected_date.strftime("%Y-%m-%d")
 
-# ✅ Temporary Debug
-st.write("Selected Date:", today_date)
-
-st.write("Attendance Rows:", len(df_today))
-
-st.dataframe(
-    df_today[
-        ["Date", "Employee"]
-    ].tail(20),
-    hide_index=True
-)
-
 employee_clean = str(employee).strip().upper()
 
 if role == "admin":
