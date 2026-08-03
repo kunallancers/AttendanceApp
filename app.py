@@ -757,87 +757,102 @@ with col2:
 
 st.subheader("📋 Today's Attendance")
 
+# ✅ Always load latest attendance
+load_attendance.clear()
+
 df_today = load_attendance()
 
-df_today.columns = df_today.columns.str.strip()
-
-# ✅ Normalize employee names
-if "Employee" in df_today.columns:
-
-    df_today["Employee"] = (
-        df_today["Employee"]
-        .astype(str)
-        .str.strip()
-        .str.upper()
-    )
-
-today_date = selected_date.strftime("%Y-%m-%d")
-
-employee_clean = str(employee).strip().upper()
-
-if role == "admin":
-
-    today_data = df_today[
-        df_today["Date"] == today_date
-    ]
-
+if df_today.empty:
+    st.info("No attendance recorded today.")
 else:
 
-    today_data = df_today[
-        (df_today["Date"] == today_date) &
-        (df_today["Employee"] == employee_clean)
-    ]
+    df_today.columns = df_today.columns.str.strip()
 
-if not today_data.empty:
-
-    display_df = today_data.copy()
-
-    display_df["Login"] = pd.to_datetime(
-        display_df["Login"],
+    # ✅ Normalize Date
+    df_today["Date"] = pd.to_datetime(
+        df_today["Date"],
         errors="coerce"
-    ).dt.strftime("%H:%M:%S")
+    ).dt.strftime("%Y-%m-%d")
 
-    display_df["Logout"] = pd.to_datetime(
-        display_df["Logout"],
-        errors="coerce"
-    ).dt.strftime("%H:%M:%S")
+    # ✅ Normalize Employee
+    if "Employee" in df_today.columns:
 
-    display_df["Logout"] = (
-        display_df["Logout"]
-        .fillna("Pending")
-    )
+        df_today["Employee"] = (
+            df_today["Employee"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
 
-    display_df = display_df.reset_index(drop=True)
+    today_date = selected_date.strftime("%Y-%m-%d")
 
-    display_df.insert(
-        0,
-        "S.No",
-        range(1, len(display_df) + 1)
-    )
+    employee_clean = str(employee).strip().upper()
 
-    st.dataframe(
-        display_df[
-            [
-                "S.No",
-                "Employee",
-                "Login",
-                "Logout",
-                "Working Hours",
-                "Status",
-                "Type",
-                "Login Latitude",
-                "Login Longitude",
-                "Logout Latitude",
-                "Logout Longitude"
-            ]
-        ],
-        use_container_width=True,
-        hide_index=True
-    )
+    if role == "admin":
 
-else:
+        today_data = df_today[
+            df_today["Date"] == today_date
+        ]
 
-    st.info("No attendance recorded for selected date.")
+    else:
+
+        today_data = df_today[
+            (df_today["Date"] == today_date) &
+            (df_today["Employee"] == employee_clean)
+        ]
+
+    if not today_data.empty:
+
+        display_df = today_data.copy()
+
+        display_df["Login"] = pd.to_datetime(
+            display_df["Login"],
+            errors="coerce"
+        ).dt.strftime("%H:%M:%S")
+
+        display_df["Logout"] = pd.to_datetime(
+            display_df["Logout"],
+            errors="coerce"
+        ).dt.strftime("%H:%M:%S")
+
+        display_df["Logout"] = (
+            display_df["Logout"]
+            .fillna("Pending")
+        )
+
+        display_df = display_df.reset_index(drop=True)
+
+        display_df.insert(
+            0,
+            "S.No",
+            range(1, len(display_df) + 1)
+        )
+
+        st.dataframe(
+            display_df[
+                [
+                    "S.No",
+                    "Employee",
+                    "Login",
+                    "Logout",
+                    "Working Hours",
+                    "Status",
+                    "Type",
+                    "Login Latitude",
+                    "Login Longitude",
+                    "Logout Latitude",
+                    "Logout Longitude"
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True
+        )
+
+    else:
+
+        st.info(
+            "No attendance recorded for selected date."
+        )
 
 # ============================================================
 # ✅ ADMIN CONTROLS
