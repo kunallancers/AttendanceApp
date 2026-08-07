@@ -752,22 +752,21 @@ with col2:
 
             st.stop()
 # ============================================================
-# ✅ TODAY'S ATTENDANCE (UPDATED & FIXED VERSION)
+# ✅ TODAY'S ATTENDANCE (IMPROVED & PRODUCTION READY)
 # ============================================================
 
 st.subheader("📋 Today's Attendance")
 
-# ✅ Always clear cache & pull fresh data from Google Sheet
-st.cache_data.clear()
-
+# ✅ Load attendance using cached data (TTL handles background updates)
 df_today = load_attendance()
 
 if df_today.empty:
     st.info("No attendance recorded today.")
 else:
+    df_today = df_today.copy()
     df_today.columns = df_today.columns.str.strip()
 
-    # ✅ Robust Date Normalization (handles DD-MM-YYYY, YYYY/MM/DD, YYYY-MM-DD)
+    # ✅ 1. Robust Date Normalization (handles DD/MM/YYYY, YYYY/MM/DD, YYYY-MM-DD)
     df_today["Date"] = pd.to_datetime(
         df_today["Date"],
         dayfirst=True,
@@ -775,7 +774,7 @@ else:
         errors="coerce"
     ).dt.strftime("%Y-%m-%d")
 
-    # ✅ Clean & Normalize Employee column
+    # ✅ 2. Clean & Normalize Employee Column
     if "Employee" in df_today.columns:
         df_today["Employee"] = (
             df_today["Employee"]
@@ -784,45 +783,62 @@ else:
             .str.upper()
         )
 
-    # ✅ Selected date formatted explicitly as YYYY-MM-DD
-    today_date = pd.to_datetime(selected_date).strftime("%Y-%m-%d")
+    # ✅ 3. Selected Date Normalization
+    target_date_str = pd.to_datetime(selected_date).strftime("%Y-%m-%d")
 
-    # ✅ Fetch active target employee
-    target_emp = active_employee if 'active_employee' in locals() else employee
-    employee_clean = str(target_emp).strip().upper()
+    # ✅ 4. Determine Active Logged-in User
+    logged_user = st.session_state.get("employee", employee if 'employee' in locals() else "")
+    employee_clean = str(logged_user).strip().upper()
 
-    # Filter data
+    # ✅ 5. Role-based Filtering
     if role == "admin":
-        today_data = df_today[df_today["Date"] == today_date]
+        # Admin sees all employee attendance for the target date
+        today_data = df_today[df_today["Date"] == target_date_str]
     else:
+        # Non-admin sees only their own attendance for the target date
         today_data = df_today[
-            (df_today["Date"] == today_date) &
+            (df_today["Date"] == target_date_str) &
             (df_today["Employee"] == employee_clean)
         ]
 
+    # ✅ 6. Render Data Frame
     if not today_data.empty:
         display_df = today_data.copy()
 
-        # Format Login / Logout times cleanly
+        # Format Login Time cleanly
         display_df["Login"] = pd.to_datetime(
             display_df["Login"], errors="coerce"
-        ).dt.strftime("%H:%M:%S").fillna(display_df["Login"])
+        ).dt.strftime("%H:%M:%S").fillna(display_df["Login"].astype(str))
 
+        # Format Logout Time cleanly & handle Pending states
         display_df["Logout"] = pd.to_datetime(
             display_df["Logout"], errors="coerce"
         ).dt.strftime("%H:%M:%S")
+        
+        display_df["Logout"] = (
+            display_df["Logout"]
+            .replace(["nan", "None", "", "NaN"], None)
+            .fillna("Pending")
+        )
 
-        display_df["Logout"] = display_df["Logout"].fillna("Pending")
+        # Fill blank values in working hours / status
+        if "Working Hours" in display_df.columns:
+            display_df["Working Hours"] = display_df["Working Hours"].replace(["", "nan", "None"], "-")
+        if "Status" in display_df.columns:
+            display_df["Status"] = display_df["Status"].replace(["", "nan", "None"], "In Progress")
 
+        # Re-index for serial numbering
         display_df = display_df.reset_index(drop=True)
         display_df.insert(0, "S.No", range(1, len(display_df) + 1))
 
-        # Show only existing columns safely
-        show_cols = [col for col in [
+        # Define display column order safely
+        column_order = [
             "S.No", "Employee", "Login", "Logout", "Working Hours",
             "Status", "Type", "Login Latitude", "Login Longitude",
             "Logout Latitude", "Logout Longitude"
-        ] if col in display_df.columns]
+        ]
+        
+        show_cols = [col for col in column_order if col in display_df.columns]
 
         st.dataframe(
             display_df[show_cols],
