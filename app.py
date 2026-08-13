@@ -18,21 +18,22 @@ st.set_page_config(
     layout="wide"
 )
 # ============================================================
-# ✅ APP HEADER WITH LOGO
+# ✅ APP HEADER (CENTERED BRAND & LOGO)
 # ============================================================
 
-col_logo, col_title = st.columns([1, 3])
+# Create 3 columns to center the logo image in the middle column
+col_left, col_mid, col_right = st.columns([1, 2, 1])
 
-with col_logo:
+with col_mid:
     try:
-        st.image("Logo white.png", width=220)
+        st.image("Logo white.png", use_container_width=True)
     except Exception:
-        # Fallback if image isn't found locally yet
-        st.write("🛡️ **LANCERS**")
+        # Fallback if image isn't found
+        st.markdown("<h2 style='text-align: center;'>🛡️ LANCERS</h2>", unsafe_allow_html=True)
 
-with col_title:
-    st.markdown("## **Lancers Risk Consulting**")
-    st.markdown("##### Attendance Management System")
+# Centered Brand Name & Subtitle
+st.markdown("<h2 style='text-align: center; margin-top: 10px;'>Lancers Risk Consulting</h2>", unsafe_allow_html=True)
+st.markdown("<h5 style='text-align: center; color: #888888;'>Attendance Management System</h5>", unsafe_allow_html=True)
 
 st.divider()
 # ============================================================
