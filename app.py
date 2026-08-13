@@ -18,6 +18,24 @@ st.set_page_config(
     layout="wide"
 )
 # ============================================================
+# ✅ APP HEADER WITH LOGO
+# ============================================================
+
+col_logo, col_title = st.columns([1, 3])
+
+with col_logo:
+    try:
+        st.image("Logo white.png", width=220)
+    except Exception:
+        # Fallback if image isn't found locally yet
+        st.write("🛡️ **LANCERS**")
+
+with col_title:
+    st.markdown("## **Lancers Risk Consulting**")
+    st.markdown("##### Attendance Management System")
+
+st.divider()
+# ============================================================
 # ✅ APP STYLING (BACKGROUND + UI)
 # ============================================================
 
