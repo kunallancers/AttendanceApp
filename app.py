@@ -80,6 +80,37 @@ def get_ist():
     return pd.Timestamp.now(
         tz="Asia/Kolkata"
     ).tz_localize(None)
+
+# ============================================================
+# ✅ HOLIDAY LIST & WEEKEND HELPER
+# ============================================================
+
+# Define official holidays in DD-MM-YY format
+HOLIDAY_LIST = {
+    "01-01-2026": "New Year",
+    "26-01-2026": "REPUBLIC DAY",
+    "16-02-2026": "MAHA SHIVRATRI",
+    "04-03-2026": "HOLI",
+    "26-03-2026": "RAM NAVMI",
+    "03-04-2026": "Good Friday",
+    "28-08-2026": "RAKSHA BANDHAN",
+    "04-09-2026": "JANMASHTAMI",
+    "02-10-2026": "GANDHI JAYANTI",
+    "20-10-2026": "DUSSEHRA",
+    "24-11-2026": "GURU NANAK'S BIRTHDAY",
+    "25-12-2026": "CHRISTMAS DAY",
+    # Add more holiday dates here ("DD-MM-YY": "Holiday Name")
+}
+
+def check_date_type(target_date):
+    """Checks if a given date is a weekend (Saturday/Sunday) or a listed holiday."""
+    # Saturday = 5, Sunday = 6
+    is_weekend = target_date.weekday() in [5, 6]
+    
+    formatted_date = target_date.strftime("%d-%m-%y")
+    holiday_name = HOLIDAY_LIST.get(formatted_date)
+    
+    return is_weekend, holiday_name
 # ============================================================
 # ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
 # ============================================================
@@ -381,16 +412,34 @@ if role == "admin":
     )
 
 # ============================================================
-# ✅ ATTENDANCE TYPE
+# ✅ ATTENDANCE TYPE & AUTO-DETECTION FOR WO / HO
 # ============================================================
+
+is_wknd, holiday_name = check_date_type(selected_date)
+
+# Determine default option based on date
+options = [
+    "Present WFO",
+    "Present WFH",
+    "Half Day",
+    "Leave",
+    "Week Off (WO)",
+    "Holiday (HO)"
+]
+
+default_idx = 0
+
+if holiday_name:
+    default_idx = 5  # "Holiday (HO)"
+    st.info(f"🎉 Selected date is an official holiday: **{holiday_name}**")
+elif is_wknd:
+    default_idx = 4  # "Week Off (WO)"
+    st.info(f"🏖 Selected date falls on a Weekend (**{selected_date.strftime('%A')}**)")
+
 attendance_type = st.selectbox(
     "Attendance Type",
-    [
-        "Present WFO",
-        "Present WFH",
-        "Half Day",
-        "Leave"
-    ],
+    options,
+    index=default_idx,
     key="attendance_type_selector"
 )
 
@@ -410,8 +459,6 @@ with col1:
         "🔑 Login",
         key="login_att_action_btn"
     ):
-
-        st.success("✅ Login button clicked")
 
         # ✅ CURRENT TIME
         login_time_str = get_ist().strftime("%H:%M:%S")
@@ -529,8 +576,18 @@ with col1:
                 st.stop()
 
         # ====================================================
-        # ✅ SAVE LOGIN
+        # ✅ SAVE LOGIN (STEP 3 INTEGRATED HERE)
         # ====================================================
+
+        # Determine status automatically based on selected Attendance Type
+        if attendance_type == "Week Off (WO)":
+            row_status = "WO"
+        elif attendance_type == "Holiday (HO)":
+            row_status = "HO"
+        else:
+            row_status = "In Progress"
+
+        is_auto_closed = row_status in ["WO", "HO"]
 
         try:
 
@@ -538,18 +595,18 @@ with col1:
                 date_str,
                 employee,
                 login_time_str,
-                "",
-                "",
-                "In Progress",
+                login_time_str if is_auto_closed else "",        # Logout Time
+                "00:00:00" if is_auto_closed else "",            # Working Hours
+                row_status,                                       # Status ("WO", "HO", or "In Progress")
                 attendance_type,
                 lat,
                 lon,
-                "",
-                ""
+                lat if is_auto_closed else "",                   # Logout Latitude
+                lon if is_auto_closed else ""                    # Logout Longitude
             ])
 
             st.success(
-                "✅ Row inserted into sheet"
+                f"✅ Attendance Recorded: {attendance_type} ({row_status})"
             )
 
         except Exception as e:
@@ -565,12 +622,6 @@ with col1:
             st.cache_data.clear()
         except Exception:
             pass
-
-        # ✅ SUCCESS MESSAGE
-        st.success(
-            f"✅ Login Recorded Successfully\n"
-            f"⏰ {login_time_str} | 📍 {lat}, {lon}"
-        )
 
         # ✅ REFRESH UI
         st.rerun()
