@@ -17,23 +17,47 @@ st.set_page_config(
     page_title="Attendance Management System",
     layout="wide"
 )
+import base64
+
 # ============================================================
-# ✅ APP HEADER (CENTERED BRAND & LOGO)
+# ✅ APP HEADER (THEME-SAFE CENTERED LOGO)
 # ============================================================
 
-# Create 3 columns to center the logo image in the middle column
-col_left, col_mid, col_right = st.columns([1, 2, 1])
-
-with col_mid:
+def get_image_base64(image_path):
+    """Converts local logo image to base64 string for CSS HTML rendering."""
     try:
-        st.image("Logo white.png", use_container_width=True)
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode("utf-8")
     except Exception:
-        # Fallback if image isn't found
-        st.markdown("<h2 style='text-align: center;'>🛡️ LANCERS</h2>", unsafe_allow_html=True)
+        return None
 
-# Centered Brand Name & Subtitle
-st.markdown("<h2 style='text-align: center; margin-top: 10px;'>Lancers Risk Consulting</h2>", unsafe_allow_html=True)
-st.markdown("<h5 style='text-align: center; color: #888888;'>Attendance Management System</h5>", unsafe_allow_html=True)
+logo_b64 = get_image_base64("Logo white.png")
+
+if logo_b64:
+    # Renders logo inside a dark rounded card container so it stays visible on Light & Dark themes
+    st.markdown(
+        f"""
+        <div style="text-align: center; margin-bottom: 10px;">
+            <div style="
+                display: inline-block;
+                background-color: #1a1e29;
+                padding: 12px 28px;
+                border-radius: 12px;
+                box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
+            ">
+                <img src="data:image/png;base64,{logo_b64}" style="max-width: 320px; height: auto;">
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    # Fallback header if image file is not found
+    st.markdown("<h2 style='text-align: center;'>🛡️ LANCERS</h2>", unsafe_allow_html=True)
+
+# Centered Brand Title & Subtitle
+st.markdown("<h2 style='text-align: center; margin-top: 5px;'>Lancers Risk Consulting</h2>", unsafe_allow_html=True)
+st.markdown("<h5 style='text-align: center; color: #777777;'>Attendance Management System</h5>", unsafe_allow_html=True)
 
 st.divider()
 # ============================================================
