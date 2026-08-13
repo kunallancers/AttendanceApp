@@ -83,54 +83,35 @@ def get_ist():
 # ============================================================
 # ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
 # ============================================================
-
-@st.cache_data(ttl=1)
+@st.cache_data(ttl=2)
 def load_attendance():
-
-    df = pd.DataFrame()   # ✅ ALWAYS DEFINE FIRST (CRITICAL FIX)
+    df = pd.DataFrame()
 
     try:
         sheet, _ = connect_sheet()
-
         data = sheet.get_all_records()
 
-        # ✅ EMPTY SHEET
         if not data:
             return pd.DataFrame(columns=[
-                "Date",
-                "Employee",
-                "Login",
-                "Logout",
-                "Working Hours",
-                "Status",
-                "Type",
-                "Login Latitude",
-                "Login Longitude",
-                "Logout Latitude",
-                "Logout Longitude"
+                "Date", "Employee", "Login", "Logout", "Working Hours",
+                "Status", "Type", "Login Latitude", "Login Longitude",
+                "Logout Latitude", "Logout Longitude"
             ])
 
-        # ✅ CREATE DF
         df = pd.DataFrame(data)
-
-        # ✅ CLEAN COLUMNS
         df.columns = df.columns.str.strip()
 
-        # ✅ CHECK REQUIRED COLUMN
         if "Date" not in df.columns:
             st.error("❌ 'Date' column missing in sheet")
             return pd.DataFrame()
 
-        # ✅ CLEAN DATA
+        # ✅ Formats date cleanly as DD-MM-YY (e.g., 13-08-26)
         df["Date"] = pd.to_datetime(
             df["Date"], dayfirst=True, format="mixed", errors="coerce"
         )
-
         df = df.dropna(subset=["Date"])
+        df["Date"] = df["Date"].dt.strftime("%d-%m-%y")
 
-        df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
-
-        # ✅ CLEAN EMPLOYEE
         if "Employee" in df.columns:
             df["Employee"] = (
                 df["Employee"]
@@ -139,11 +120,11 @@ def load_attendance():
                 .str.upper()
             )
 
-        return df   # ✅ ALWAYS SAFE
+        return df
 
     except Exception as e:
         st.error(f"❌ Error loading attendance: {e}")
-        return df   # ✅ RETURN SAFE EMPTY DF (FIX)
+        return df
 # ============================================================
 # ✅ LOAD LEAVE (SAFE VERSION ✅ PLACE HERE)
 # ============================================================
@@ -168,7 +149,7 @@ def load_leave():
         if "Date" in df.columns:
             df["Date"] = pd.to_datetime(
                 df["Date"], dayfirst=True, format="mixed", errors="coerce"
-            ).dt.strftime("%Y-%m-%d")
+            ).dt.strftime("%d-%m-%y")
 
         # ✅ Normalize employee name
         if "Employee" in df.columns:
@@ -386,7 +367,7 @@ else:
         key="admin_date_selector"
     )
 
-date_str = selected_date.strftime("%Y-%m-%d")
+date_str = selected_date.strftime("%d-%m-%y")
 
 # ============================================================
 # ✅ ADMIN EMPLOYEE SELECTION
@@ -436,7 +417,7 @@ with col1:
         login_time_str = get_ist().strftime("%H:%M:%S")
 
         # ✅ DATE
-        date_str = selected_date.strftime("%Y-%m-%d")
+        date_str = selected_date.strftime("%d-%m-%y")
 
         # ✅ NORMALIZE EMPLOYEE
         employee_clean = str(employee).strip().upper()
@@ -614,7 +595,7 @@ with col2:
         df["Date"] = pd.to_datetime(
             df["Date"],
             dayfirst=True, format="mixed", errors="coerce"
-        ).dt.strftime("%Y-%m-%d")
+        ).dt.strftime("%d-%m-%y")
 
         # ✅ Normalize employee names
         employee_clean = str(employee).strip().upper()
@@ -626,7 +607,7 @@ with col2:
             .str.upper()
         )
 
-        today_date = selected_date.strftime("%Y-%m-%d")
+        today_date = selected_date.strftime("%d-%m-%y")
 
         user_today = df[
             (df["Date"] == today_date) &
@@ -772,7 +753,7 @@ else:
         dayfirst=True,
         format="mixed",
         errors="coerce"
-    ).dt.strftime("%Y-%m-%d")
+    ).dt.strftime("%d-%m-%y")
 
     # ✅ 2. Clean & Normalize Employee Column
     if "Employee" in df_today.columns:
@@ -784,7 +765,7 @@ else:
         )
 
     # ✅ 3. Selected Date Normalization
-    target_date_str = pd.to_datetime(selected_date).strftime("%Y-%m-%d")
+    target_date_str = pd.to_datetime(selected_date).strftime("%d-%m-%y")
 
     # ✅ 4. Determine Active Logged-in User
     logged_user = st.session_state.get("employee", employee if 'employee' in locals() else "")
@@ -939,7 +920,7 @@ if role == "admin":
             df["Date"] = pd.to_datetime(
                 df["Date"],
                 dayfirst=True, format="mixed", errors="coerce"
-            ).dt.strftime("%Y-%m-%d")
+            ).dt.strftime("%d-%m-%y")
 
             # Remove only truly identical rows
             df_clean = df.drop_duplicates()
@@ -1028,7 +1009,7 @@ if role == "employee":
 
             for d in dates:
 
-                d_str = d.strftime("%Y-%m-%d")
+                d_str = d.strftime("%d-%m-%y")
 
                 duplicate = leave_df[
                     (leave_df["Employee"] == employee_clean) &
@@ -1197,7 +1178,7 @@ if not df.empty:
 
             df = df[
                 df["Date"] ==
-                date_filter.strftime("%Y-%m-%d")
+                date_filter.strftime("%d-%m-%y")
             ]
 
     # ========================================================
@@ -1280,7 +1261,7 @@ if selected_employee != "All":
 monthly_df = monthly_df.copy()
 
 # ✅ ✅ ADD YOUR FIXES HERE ✅
-monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%Y-%m-%d")
+monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%d-%m-%y")
 monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
 
 st.divider()
@@ -1355,7 +1336,7 @@ if not monthly_df.empty:
 
     # Clean out invalid NaT dates and format cleanly as YYYY-MM-DD
     monthly_df_clean = monthly_df_clean.dropna(subset=["Date_Parsed"])
-    monthly_df_clean["Date"] = monthly_df_clean["Date_Parsed"].dt.strftime("%Y-%m-%d")
+    monthly_df_clean["Date"] = monthly_df_clean["Date_Parsed"].dt.strftime("%d-%m-%y")
 
     # Toggle between All Dates in Month or Specific Date
     col_cal1, col_cal2 = st.columns([1, 2])
@@ -1376,7 +1357,7 @@ if not monthly_df.empty:
                 value=date.today(),
                 key="attendance_details_calendar"
             )
-            date_str_filter = selected_calendar_date.strftime("%Y-%m-%d")
+            date_str_filter = selected_calendar_date.strftime("%d-%m-%y")
         else:
             date_str_filter = None
 
