@@ -82,10 +82,9 @@ def get_ist():
     ).tz_localize(None)
 
 # ============================================================
-# ✅ HOLIDAY LIST & WEEKEND HELPER
+# ✅ HOLIDAY LIST & WEEKEND HELPER (FIXED)
 # ============================================================
 
-# Define official holidays in DD-MM-YY format
 HOLIDAY_LIST = {
     "01-01-2026": "New Year",
     "26-01-2026": "REPUBLIC DAY",
@@ -99,7 +98,6 @@ HOLIDAY_LIST = {
     "20-10-2026": "DUSSEHRA",
     "24-11-2026": "GURU NANAK'S BIRTHDAY",
     "25-12-2026": "CHRISTMAS DAY",
-    # Add more holiday dates here ("DD-MM-YY": "Holiday Name")
 }
 
 def check_date_type(target_date):
@@ -107,7 +105,8 @@ def check_date_type(target_date):
     # Saturday = 5, Sunday = 6
     is_weekend = target_date.weekday() in [5, 6]
     
-    formatted_date = target_date.strftime("%d-%m-%y")
+    # ✅ Fixed to %d-%m-%Y (4-digit year) to match dictionary keys
+    formatted_date = target_date.strftime("%d-%m-%Y")
     holiday_name = HOLIDAY_LIST.get(formatted_date)
     
     return is_weekend, holiday_name
