@@ -1,7 +1,8 @@
 streamlit
 pandas
+openpyxl
 gspread
 oauth2client
-openpyxl
-pytz
 streamlit-geolocation
+pytz
+plotly
