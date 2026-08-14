@@ -1,1862 +1,3544 @@
+""" 
+Lancers Risk Consulting - Attendance Management & Workforce Analytics
+Corporate Enterprise SaaS UI integrated with the existing AttendanceData Google Sheet.
+
+Preserved core functionality:
+- employees.xlsx authentication
+- Google Sheets AttendanceData / Leave integration
+- Employee/Admin roles
+- GPS capture
+- Login / Logout attendance
+- Leave application and approval
+- Attendance records
+- Admin clear / duplicate cleanup
+- CSV exports
+- Corporate dashboard inspired by the supplied design
+"""
+
 import os
-import time
-from datetime import date, datetime, timezone
+import base64
+import html
+from datetime import date, datetime, time, timedelta
+
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import pytz
 import streamlit as st
-import streamlit.components.v1 as components
+from oauth2client.service_account import ServiceAccountCredentials
 from streamlit_geolocation import streamlit_geolocation
 
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 
 # ============================================================
-# ✅ LIGHT DASHBOARD CUSTOM CSS
-# ============================================================
-
-st.markdown("""
-<style>
-    /* Global Page Styling */
-    .main .block-container {
-        max-width: 1350px;
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
-    }
-    
-    /* White Rounded Card Layout */
-    .dashboard-card {
-        background-color: #ffffff;
-        border-radius: 18px;
-        padding: 20px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
-        border: 1px solid #e5e7eb;
-        margin-bottom: 20px;
-    }
-
-    /* KPI Card Box */
-    .kpi-card {
-        background-color: #ffffff;
-        border-radius: 16px;
-        padding: 16px 20px;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-    }
-    .kpi-title { font-size: 0.85rem; color: #6b7280; font-weight: 600; }
-    .kpi-val { font-size: 1.6rem; font-weight: 700; color: #111827; margin: 4px 0; }
-    .kpi-sub-green { font-size: 0.78rem; color: #10b981; font-weight: 600; }
-    .kpi-sub-pink { font-size: 0.78rem; color: #ec4899; font-weight: 600; }
-
-    /* Employee Status Items */
-    .emp-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 6px 0;
-        font-size: 0.88rem;
-        font-weight: 500;
-        color: #374151;
-    }
-    .dot-green { height: 10px; width: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; }
-    .dot-pink { height: 10px; width: 10px; background-color: #ec4899; border-radius: 50%; display: inline-block; }
-</style>
-""", unsafe_allow_html=True)
-
-# ============================================================
-# ✅ MAIN DASHBOARD GRID
-# ============================================================
-
-col_left, col_right = st.columns([1, 3.2])
-
-# ------------------------------------------------------------
-# LEFT COLUMN: EMPLOYEE STATUS LIST
-# ------------------------------------------------------------
-with col_left:
-    st.markdown("""
-    <div class="dashboard-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h4 style="margin: 0; color: #111827; font-size: 1.1rem;">Employees</h4>
-            <span style="font-weight: 700; color: #10b981; font-size: 1.1rem;">13 <span style="color: #9ca3af; font-size: 0.9rem;">/ 16</span></span>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    dept_filter = st.selectbox("Department", ["All Departments", "Operations", "Consulting", "IT"], label_visibility="collapsed")
-    
-    # Employee List with Live Status Dots
-    employees_data = [
-        ("Fiona Varley", True), ("Shreya McCallum", True), ("Heidi Andrews", True),
-        ("Kealan Madden", True), ("Dillon Hill", True), ("Lucia Walters", True),
-        ("Rene Holcomb", True), ("Alison Strong", True), ("Dave Jull", True),
-        ("Trevor Wu", True), ("Cair Byron", True), ("Samantha Parsons", True),
-        ("Amber Childs", True), ("Taylor Smith", False), ("Dylan Fear", False), ("Hannah Martin", False)
-    ]
-
-    st.markdown("<div style='margin-top: 15px;'>", unsafe_allow_html=True)
-    for name, is_active in employees_data:
-        dot_class = "dot-green" if is_active else "dot-pink"
-        st.markdown(f'<div class="emp-item"><span class="{dot_class}"></span>{name}</div>', unsafe_allow_html=True)
-    st.markdown("</div></div>", unsafe_allow_html=True)
-
-# ------------------------------------------------------------
-# RIGHT COLUMN: CHARTS & METRICS GRID
-# ------------------------------------------------------------
-with col_right:
-    
-    # --- ROW 1: TOP CHARTS (PRODUCTIVE HOURS & ATTENDANCE TREND) ---
-    r1_col1, r1_col2 = st.columns(2)
-
-    with r1_col1:
-        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-        st.markdown("""
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h5 style="margin: 0; color: #111827;">Total Productive Hours</h5>
-                <p style="margin: 0; font-size: 0.78rem; color: #9ca3af;">Compared to last week</p>
-            </div>
-            <div style="text-align: right;">
-                <span style="font-size: 1.2rem; font-weight: 700; color: #10b981;">450</span><span style="color: #9ca3af;"> / 500 hours</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Bar Chart: Productive Hours
-        days = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-        actual_hours = [35, 18, 42, 38, 45, 15, 12]
-        target_hours = [40, 30, 45, 42, 48, 20, 18]
-
-        fig_bar = go.Figure()
-        fig_bar.add_trace(go.Bar(x=days, y=actual_hours, name='Actual', marker_color='#F59E0B', width=0.35))
-        fig_bar.add_trace(go.Bar(x=days, y=target_hours, name='Target', marker_color='#E5E7EB', width=0.35))
-        
-        fig_bar.update_layout(
-            barmode='group',
-            height=210,
-            margin=dict(l=10, r=10, t=20, b=10),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=False,
-            yaxis=dict(showgrid=True, gridcolor='#f3f4f6')
-        )
-        st.plotly_chart(fig_bar, use_container_width=True, config={'displayModeBar': False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with r1_col2:
-        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-        st.markdown("""
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h5 style="margin: 0; color: #111827;">Total Attendance</h5>
-                <p style="margin: 0; font-size: 0.78rem; color: #9ca3af;">Compared to last week</p>
-            </div>
-            <span style="font-size: 1.3rem; font-weight: 700; color: #10b981;">18 <span style="font-size: 0.8rem; font-weight: 600;">▲ Up 5%</span></span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Line Chart: Attendance Trend
-        trend_current = [12, 8, 16, 14, 8, 12, 5]
-        trend_previous = [15, 10, 18, 15, 17, 14, 7]
-
-        fig_line = go.Figure()
-        fig_line.add_trace(go.Scatter(x=days, y=trend_current, mode='lines+markers', line=dict(color='#F59E0B', width=3), name='This Week'))
-        fig_line.add_trace(go.Scatter(x=days, y=trend_previous, mode='lines', line=dict(color='#CBD5E1', width=2, dash='dot'), name='Last Week'))
-
-        fig_line.update_layout(
-            height=210,
-            margin=dict(l=10, r=10, t=20, b=10),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=False,
-            yaxis=dict(showgrid=True, gridcolor='#f3f4f6')
-        )
-        st.plotly_chart(fig_line, use_container_width=True, config={'displayModeBar': False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- ROW 2: BOTTOM CHARTS & 2x2 METRIC GRID ---
-    r2_col1, r2_col2, r2_col3 = st.columns([1.2, 1.2, 1.6])
-
-    with r2_col1:
-        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-        st.markdown('<h5 style="margin: 0 0 10px 0; color: #111827;">Lateness</h5>', unsafe_allow_html=True)
-
-        # Horizontal Bar Chart
-        categories = ['Early', 'On-time', 'Late']
-        counts = [3, 9, 2]
-        colors = ['#F59E0B', '#10B981', '#EC4899']
-
-        fig_horiz = go.Figure(go.Bar(
-            x=counts, y=categories, orientation='h',
-            marker=dict(color=colors), width=0.4
-        ))
-        fig_horiz.update_layout(
-            height=180,
-            margin=dict(l=10, r=10, t=10, b=10),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False)
-        )
-        st.plotly_chart(fig_horiz, use_container_width=True, config={'displayModeBar': False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with r2_col2:
-        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
-        st.markdown('<h5 style="margin: 0 0 10px 0; color: #111827;">Worked Hours</h5>', unsafe_allow_html=True)
-
-        # Donut Chart
-        fig_donut = go.Figure(data=[go.Pie(
-            labels=['Standard', 'Overtime', 'Leave', 'Other'],
-            values=[70, 15, 10, 5],
-            hole=.6,
-            marker=dict(colors=['#F59E0B', '#10B981', '#EC4899', '#E5E7EB']),
-            textinfo='none'
-        )])
-        fig_donut.update_layout(
-            height=180,
-            margin=dict(l=10, r=10, t=10, b=10),
-            paper_bgcolor='rgba(0,0,0,0)',
-            showlegend=False
-        )
-        st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with r2_col3:
-        # 2x2 Metric Grid
-        m_row1_1, m_row1_2 = st.columns(2)
-        with m_row1_1:
-            st.markdown("""
-            <div class="kpi-card">
-                <div class="kpi-title">Total Hours</div>
-                <div class="kpi-val">2300</div>
-                <div class="kpi-sub-green">▲ Up 28% from last week</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with m_row1_2:
-            st.markdown("""
-            <div class="kpi-card">
-                <div class="kpi-title">Total Attendance</div>
-                <div class="kpi-val" style="color: #10b981;">20 <span style="font-size: 1rem; color: #6b7280;">/ 22 hrs</span></div>
-                <div class="kpi-sub-green">▲ Up 8% from last week</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
-
-        m_row2_1, m_row2_2 = st.columns(2)
-        with m_row2_1:
-            st.markdown("""
-            <div class="kpi-card">
-                <div class="kpi-title">Employees Late</div>
-                <div class="kpi-val" style="color: #ec4899;">12</div>
-                <div class="kpi-sub-pink">▼ Up 20% from avg</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with m_row2_2:
-            st.markdown("""
-            <div class="kpi-card">
-                <div class="kpi-title">Total Flags</div>
-                <div class="kpi-val" style="color: #ec4899;">17</div>
-                <div class="kpi-sub-pink">▼ Up 33% from avg</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-import base64
-import streamlit as st
-
-# ============================================================
-# ✅ PAGE CONFIG (MUST BE CALLED ONLY ONCE AT THE VERY TOP)
+# 1. PAGE CONFIGURATION
 # ============================================================
 
 st.set_page_config(
-    page_title="Attendance Management System",
-    layout="wide"
+    page_title="Lancers HRMS | Attendance Management",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
+IST = pytz.timezone("Asia/Kolkata")
+
+ATTENDANCE_HEADERS = [
+    "Date",
+    "Employee",
+    "Login",
+    "Logout",
+    "Working Hours",
+    "Status",
+    "Type",
+    "Login Latitude",
+    "Login Longitude",
+    "Logout Latitude",
+    "Logout Longitude",
+]
+
+LEAVE_HEADERS = ["Employee", "Date", "Reason", "Status"]
+
+
 # ============================================================
-# ✅ UNIFIED CORPORATE DASHBOARD STYLING (CSS)
+# 2. CORPORATE CSS
 # ============================================================
 
-st.markdown("""
+st.markdown(
+    """
 <style>
-    /* 1. Global Font & Main Container */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    
-    .main .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2.5rem;
-        max-width: 1350px;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-    /* 2. Elevated Header Banner */
-    .brand-banner {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 20px;
-        text-align: center;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-    }
+html, body, [class*="css"] {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont,
+                 'Segoe UI', Roboto, sans-serif;
+}
 
-    /* 3. Dashboard & KPI Metric Cards */
-    .dashboard-card {
-        background-color: #ffffff;
-        border-radius: 18px;
-        padding: 20px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
-        border: 1px solid #e5e7eb;
-        margin-bottom: 20px;
-    }
+.stApp {
+    background: #F5F7FB;
+}
 
-    .kpi-card {
-        background-color: #ffffff;
-        border-radius: 16px;
-        padding: 16px 20px;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-    }
-    .kpi-title { font-size: 0.85rem; color: #6b7280; font-weight: 600; }
-    .kpi-val { font-size: 1.6rem; font-weight: 700; color: #111827; margin: 4px 0; }
-    .kpi-sub-green { font-size: 0.78rem; color: #10b981; font-weight: 600; }
-    .kpi-sub-pink { font-size: 0.78rem; color: #ec4899; font-weight: 600; }
+.main .block-container {
+    padding-top: 1rem;
+    padding-bottom: 2.5rem;
+    max-width: 1500px;
+}
 
-    /* 4. Streamlit Metric Component Overrides */
-    div[data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 16px 20px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-        transition: all 0.3s ease;
-    }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-3px);
-        border-color: rgba(99, 102, 241, 0.4);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-    }
-    div[data-testid="stMetricValue"] {
-        font-weight: 700;
-        font-size: 1.9rem;
-    }
+section[data-testid="stSidebar"] {
+    background: #FFFFFF;
+    border-right: 1px solid #E2E8F0;
+}
 
-    /* 5. Employee List Status Indicators */
-    .emp-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 6px 0;
-        font-size: 0.88rem;
-        font-weight: 500;
-        color: #374151;
-    }
-    .dot-green { height: 10px; width: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; }
-    .dot-pink { height: 10px; width: 10px; background-color: #ec4899; border-radius: 50%; display: inline-block; }
+section[data-testid="stSidebar"] > div {
+    padding-top: 1rem;
+}
 
-    /* 6. Button Animations & Form Elements */
-    .stButton > button {
-        border-radius: 10px;
-        font-weight: 600;
-        letter-spacing: 0.3px;
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 0.5rem 1.25rem;
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
-    }
-    .stTextInput > div > div > input, .stSelectbox > div > div {
-        border-radius: 10px;
-    }
-    [data-testid="stDataFrame"] {
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        overflow: hidden;
-    }
-    hr {
-        margin: 2rem 0;
-        border-color: rgba(255, 255, 255, 0.08);
-    }
+.saas-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.05);
+    margin-bottom: 16px;
+}
+
+.header-card {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    border-radius: 18px;
+    padding: 18px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 28px -8px rgba(15, 23, 42, 0.35);
+    color: white;
+}
+
+.header-title {
+    color: #FFFFFF;
+    font-size: 1.35rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.header-subtitle {
+    color: #94A3B8;
+    font-size: 0.78rem;
+    margin-top: 3px;
+}
+
+.header-user {
+    color: #FFFFFF;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.header-date {
+    color: #38BDF8;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-align: right;
+    margin-top: 3px;
+}
+
+.kpi-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 15px;
+    padding: 15px 17px;
+    min-height: 112px;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.035);
+}
+
+.kpi-title {
+    color: #64748B;
+    font-size: 0.73rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.45px;
+}
+
+.kpi-value {
+    color: #0F172A;
+    font-size: 1.65rem;
+    line-height: 1.15;
+    font-weight: 800;
+    margin: 6px 0 5px 0;
+}
+
+.kpi-positive { color: #10B981; }
+.kpi-warning { color: #F59E0B; }
+.kpi-danger { color: #EC4899; }
+.kpi-info { color: #2563EB; }
+
+.kpi-sub {
+    color: #94A3B8;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.emp-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 9px;
+    border-radius: 9px;
+    margin-bottom: 3px;
+    background: #F8FAFC;
+    border: 1px solid #F1F5F9;
+    color: #334155;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.emp-item:hover {
+    background: #F1F5F9;
+}
+
+.status-dot {
+    height: 9px;
+    width: 9px;
+    min-width: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-green { background: #10B981; }
+.dot-pink { background: #EC4899; }
+.dot-blue { background: #3B82F6; }
+
+.small-muted {
+    color: #94A3B8;
+    font-size: 0.74rem;
+}
+
+.section-title {
+    color: #0F172A;
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin: 5px 0 12px 0;
+}
+
+div[data-testid="stDataFrame"] {
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.stButton > button {
+    border-radius: 10px;
+    font-weight: 700;
+    border: 1px solid #CBD5E1;
+    transition: all .2s ease;
+}
+
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 15px rgba(15, 23, 42, .10);
+}
+
+.stTextInput input,
+.stSelectbox [data-baseweb="select"],
+.stDateInput input {
+    border-radius: 10px !important;
+}
+
+div[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    padding: 12px 16px;
+}
+
+hr {
+    border-color: #E2E8F0;
+}
+
+.login-wrap {
+    max-width: 460px;
+    margin: 7vh auto 0 auto;
+}
+
+.login-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 22px;
+    padding: 32px;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, .10);
+}
+
+.login-brand {
+    text-align: center;
+    color: #0F172A;
+    font-size: 1.45rem;
+    font-weight: 800;
+}
+
+.login-sub {
+    text-align: center;
+    color: #64748B;
+    font-size: .82rem;
+    margin-bottom: 20px;
+}
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 # ============================================================
-# ✅ APP HEADER (THEME-SAFE CENTERED LOGO & BRAND)
+# 3. COMMON HELPERS
 # ============================================================
 
-def get_image_base64(image_path):
+def norm_name(value):
+    return str(value).strip().upper()
+
+
+def clean_text(value, fallback=""):
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    if text.lower() in {"nan", "none", "nat"}:
+        return fallback
+    return text
+
+
+def html_text(value):
+    return html.escape(clean_text(value))
+
+
+def get_ist():
+    return pd.Timestamp.now(tz="Asia/Kolkata").tz_localize(None)
+
+
+def date_key(value):
+    parsed = pd.to_datetime(value, dayfirst=True, format="mixed", errors="coerce")
+    if pd.isna(parsed):
+        return ""
+    return parsed.strftime("%d-%m-%y")
+
+
+def time_to_seconds(value):
     try:
-        with open(image_path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode("utf-8")
+        parsed = pd.to_datetime(str(value).strip(), format="%H:%M:%S", errors="coerce")
+        if pd.isna(parsed):
+            return None
+        return parsed.hour * 3600 + parsed.minute * 60 + parsed.second
     except Exception:
         return None
 
-logo_b64 = get_image_base64("Logo white.png")
 
-if logo_b64:
-    st.markdown(
-        f"""
-        <div class="brand-banner">
-            <img src="data:image/png;base64,{logo_b64}" style="max-width: 320px; height: auto; margin-bottom: 8px;">
-            <h2 style="margin: 0; font-size: 1.6rem; color: #ffffff; font-weight: 700;">Lancers Risk Consulting</h2>
-            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.95rem;">Attendance Management System</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    st.markdown("<h2 style='text-align: center;'>🛡️ Lancers Risk Consulting</h2>", unsafe_allow_html=True)
-    st.markdown("<h5 style='text-align: center; color: #888;'>Attendance Management System</h5>", unsafe_allow_html=True)
+def working_hours_to_decimal(value):
+    text = clean_text(value, "0")
+    try:
+        if ":" in text:
+            parts = text.split(":")
+            return float(parts[0]) + float(parts[1]) / 60 + (
+                float(parts[2]) / 3600 if len(parts) > 2 else 0
+            )
+        return float(text)
+    except Exception:
+        return 0.0
 
-st.divider()
+
+def calculate_duration_str(login_time_str, logout_time_str):
+    try:
+        t_in = pd.to_datetime(str(login_time_str), format="%H:%M:%S", errors="coerce")
+        t_out = pd.to_datetime(str(logout_time_str), format="%H:%M:%S", errors="coerce")
+        if pd.isna(t_in) or pd.isna(t_out):
+            return "00:00:00", 0.0
+        delta = t_out - t_in
+        if delta.total_seconds() < 0:
+            delta += pd.Timedelta(days=1)
+        seconds = max(0, int(delta.total_seconds()))
+        h = seconds // 3600
+        m = (seconds % 3600) // 60
+        s = seconds % 60
+        return f"{h:02d}:{m:02d}:{s:02d}", round(seconds / 3600, 2)
+    except Exception:
+        return "00:00:00", 0.0
+
+
+def determine_attendance_status(total_hours_dec):
+    if total_hours_dec >= 8:
+        return "Full Day"
+    if total_hours_dec >= 4:
+        return "Half Day"
+    if total_hours_dec > 0:
+        return "Short Day"
+    return "In Progress"
+
+
+def get_lateness_category(login_time_str):
+    seconds = time_to_seconds(login_time_str)
+    if seconds is None:
+        return "On Time"
+    if seconds < 9 * 3600 + 15 * 60:
+        return "Early"
+    if seconds <= 9 * 3600 + 35 * 60:
+        return "On Time"
+    return "Late"
+
+
+def check_date_type(target_date):
+    holiday_list = {
+        "01-01-2026": "New Year's Day",
+        "26-01-2026": "Republic Day",
+        "16-02-2026": "Maha Shivratri",
+        "04-03-2026": "Holi",
+        "26-03-2026": "Ram Navami",
+        "03-04-2026": "Good Friday",
+        "28-08-2026": "Raksha Bandhan",
+        "04-09-2026": "Janmashtami",
+        "02-10-2026": "Gandhi Jayanti",
+        "20-10-2026": "Dussehra",
+        "24-11-2026": "Guru Nanak Jayanti",
+        "25-12-2026": "Christmas Day",
+    }
+    is_weekend = target_date.weekday() in [5, 6]
+    return is_weekend, holiday_list.get(target_date.strftime("%d-%m-%Y"))
+
+
+def clear_data_cache():
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+
+
 # ============================================================
-# ✅ APP STYLING (BACKGROUND + UI)
+# 4. GOOGLE SHEETS CONNECTION
 # ============================================================
 
-from datetime import datetime, date, timezone
-import pytz
-import os
-import time
-
-# ✅ Auto refresh every 5 seconds
-# if "last_refresh" not in st.session_state:
-#     st.session_state["last_refresh"] = time.time()
-
-# current_time = time.time()
-
-# if current_time - st.session_state["last_refresh"] > 5:
-#     st.session_state["last_refresh"] = current_time
-#     st.rerun()
-
-# ============================================================
-# ✅ GOOGLE SHEET CONNECTION (FINAL STABLE VERSION)
-# ============================================================
-
-from oauth2client.service_account import ServiceAccountCredentials
-import gspread
-
-
-@st.cache_resource  # ✅ CRITICAL FIX (prevents API errors)
+@st.cache_resource
 def connect_sheet():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
 
     try:
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
-
-        # ✅ Load credentials
-        creds_dict = st.secrets["gcp_service_account"]
-
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(
-            creds_dict, scope
-        )
-
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
 
-        # ✅ Open sheets (ONLY ONCE due to caching)
-        sheet = client.open("AttendanceData").sheet1
-        leave_sheet = client.open("AttendanceData").worksheet("Leave")
+        workbook_name = st.secrets.get("SHEET_NAME", "AttendanceData")
+        workbook = client.open(workbook_name)
+        sheet = workbook.sheet1
+
+        try:
+            leave_sheet = workbook.worksheet("Leave")
+        except Exception:
+            leave_sheet = workbook.add_worksheet(title="Leave", rows=1000, cols=4)
+            leave_sheet.append_row(LEAVE_HEADERS)
 
         return sheet, leave_sheet
 
-    except Exception as e:
-        st.error("❌ Google Sheet connection failed")
-        st.error(str(e))  # optional debug
+    except Exception as exc:
+        st.error("❌ Google Sheet connection failed.")
+        st.error(str(exc))
         st.stop()
-# ============================================================
-# ✅ IST TIME
-# ============================================================
 
-def get_ist():
-    return pd.Timestamp.now(
-        tz="Asia/Kolkata"
-    ).tz_localize(None)
 
 # ============================================================
-# ✅ HOLIDAY LIST & WEEKEND HELPER (FIXED)
+# 5. EMPLOYEE MASTER / AUTHENTICATION
 # ============================================================
 
-HOLIDAY_LIST = {
-    "01-01-2026": "New Year",
-    "26-01-2026": "REPUBLIC DAY",
-    "16-02-2026": "MAHA SHIVRATRI",
-    "04-03-2026": "HOLI",
-    "26-03-2026": "RAM NAVMI",
-    "03-04-2026": "Good Friday",
-    "28-08-2026": "RAKSHA BANDHAN",
-    "04-09-2026": "JANMASHTAMI",
-    "02-10-2026": "GANDHI JAYANTI",
-    "20-10-2026": "DUSSEHRA",
-    "24-11-2026": "GURU NANAK'S BIRTHDAY",
-    "25-12-2026": "CHRISTMAS DAY",
-}
+@st.cache_data(ttl=300)
+def load_employee_master():
+    try:
+        if not os.path.exists("employees.xlsx"):
+            st.error("❌ employees.xlsx not found in the application folder.")
+            st.stop()
 
-def check_date_type(target_date):
-    """Checks if a given date is a weekend (Saturday/Sunday) or a listed holiday."""
-    # Saturday = 5, Sunday = 6
-    is_weekend = target_date.weekday() in [5, 6]
-    
-    # ✅ Fixed to %d-%m-%Y (4-digit year) to match dictionary keys
-    formatted_date = target_date.strftime("%d-%m-%Y")
-    holiday_name = HOLIDAY_LIST.get(formatted_date)
-    
-    return is_weekend, holiday_name
+        df = pd.read_excel("employees.xlsx")
+        df.columns = df.columns.astype(str).str.strip()
+
+        required = ["Employee Name", "Password"]
+        missing = [c for c in required if c not in df.columns]
+
+        if missing:
+            st.error(f"❌ Missing columns in employees.xlsx: {', '.join(missing)}")
+            st.stop()
+
+        df["Employee Name"] = df["Employee Name"].astype(str).str.strip()
+        return df
+
+    except Exception as exc:
+        st.error(f"❌ Unable to load employees.xlsx: {exc}")
+        st.stop()
+
+
+def build_users(df_emp):
+    users = {
+        "admin": {
+            "password": "admin123",
+            "role": "admin",
+            "employee": "ADMIN",
+        }
+    }
+
+    for _, row in df_emp.iterrows():
+        employee_name = clean_text(row.get("Employee Name"))
+        if not employee_name:
+            continue
+
+        username = employee_name.split()[0].lower()
+
+        users[username] = {
+            "password": clean_text(row.get("Password")),
+            "role": "employee",
+            "employee": employee_name,
+        }
+
+    return users
+
+
 # ============================================================
-# ✅ LOAD ATTENDANCE (FINAL FIXED VERSION)
+# 6. ATTENDANCE / LEAVE DATA
 # ============================================================
+
 @st.cache_data(ttl=2)
 def load_attendance():
-    df = pd.DataFrame()
-
     try:
         sheet, _ = connect_sheet()
         data = sheet.get_all_records()
 
         if not data:
-            return pd.DataFrame(columns=[
-                "Date", "Employee", "Login", "Logout", "Working Hours",
-                "Status", "Type", "Login Latitude", "Login Longitude",
-                "Logout Latitude", "Logout Longitude"
-            ])
+            return pd.DataFrame(columns=ATTENDANCE_HEADERS)
 
         df = pd.DataFrame(data)
-        df.columns = df.columns.str.strip()
+        df.columns = df.columns.astype(str).str.strip()
 
-        if "Date" not in df.columns:
-            st.error("❌ 'Date' column missing in sheet")
-            return pd.DataFrame()
+        for col in ATTENDANCE_HEADERS:
+            if col not in df.columns:
+                df[col] = ""
 
-        # ✅ Formats date cleanly as DD-MM-YY (e.g., 13-08-26)
-        df["Date"] = pd.to_datetime(
-            df["Date"], dayfirst=True, format="mixed", errors="coerce"
-        )
-        df = df.dropna(subset=["Date"])
-        df["Date"] = df["Date"].dt.strftime("%d-%m-%y")
-
-        if "Employee" in df.columns:
-            df["Employee"] = (
-                df["Employee"]
-                .astype(str)
-                .str.strip()
-                .str.upper()
-            )
+        df = df[ATTENDANCE_HEADERS].copy()
+        df["Date"] = df["Date"].apply(date_key)
+        df["Employee"] = df["Employee"].apply(norm_name)
 
         return df
 
-    except Exception as e:
-        st.error(f"❌ Error loading attendance: {e}")
-        return df
-# ============================================================
-# ✅ LOAD LEAVE (SAFE VERSION ✅ PLACE HERE)
-# ============================================================
+    except Exception as exc:
+        st.error(f"❌ Error loading attendance: {exc}")
+        return pd.DataFrame(columns=ATTENDANCE_HEADERS)
+
+
+@st.cache_data(ttl=5)
 def load_leave():
-
     try:
         _, leave_sheet = connect_sheet()
-
         data = leave_sheet.get_all_records()
 
         if not data:
-            return pd.DataFrame(columns=[
-                "Employee",
-                "Date",
-                "Reason",
-                "Status"
-            ])
+            return pd.DataFrame(columns=LEAVE_HEADERS)
 
         df = pd.DataFrame(data)
-        df.columns = df.columns.str.strip()
+        df.columns = df.columns.astype(str).str.strip()
 
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(
-                df["Date"], dayfirst=True, format="mixed", errors="coerce"
-            ).dt.strftime("%d-%m-%y")
+        for col in LEAVE_HEADERS:
+            if col not in df.columns:
+                df[col] = ""
 
-        # ✅ Normalize employee name
-        if "Employee" in df.columns:
-            df["Employee"] = (
-                df["Employee"]
-                .astype(str)
-                .str.strip()
-                .str.upper()
-            )
+        df = df[LEAVE_HEADERS].copy()
+        df["Employee"] = df["Employee"].apply(norm_name)
+        df["Date"] = df["Date"].apply(date_key)
 
         return df
 
-    except Exception as e:
-        st.error(f"❌ Error loading leave: {e}")
-        return pd.DataFrame()
+    except Exception as exc:
+        st.error(f"❌ Error loading leave records: {exc}")
+        return pd.DataFrame(columns=LEAVE_HEADERS)
 
-# ✅ ALWAYS LOAD FRESH DATA AFTER CALL
-df = load_attendance()
 
-# ============================================================
-# ✅ SESSION STATE
-# ============================================================
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-if "role" not in st.session_state:
-    st.session_state["role"] = ""
+def save_attendance_dataframe(df):
+    sheet, _ = connect_sheet()
+    data = df.copy()
 
-if "employee" not in st.session_state:
-    st.session_state["employee"] = ""
+    for col in ATTENDANCE_HEADERS:
+        if col not in data.columns:
+            data[col] = ""
 
-# ============================================================
-# ✅ LOAD EMPLOYEE FILE
-# ============================================================
-try:
-    df_emp = pd.read_excel("employees.xlsx")
+    data = data[ATTENDANCE_HEADERS].fillna("")
+    values = [ATTENDANCE_HEADERS] + data.astype(str).values.tolist()
 
-except Exception as e:
-    st.error(f"❌ employees.xlsx not found\n\n{e}")
-    st.stop()
+    sheet.clear()
+    sheet.update("A1", values)
+    clear_data_cache()
 
-df_emp.columns = df_emp.columns.str.strip()
-
-required_columns = ["Employee Name", "Password"]
-
-for col in required_columns:
-    if col not in df_emp.columns:
-        st.error(f"❌ Missing column in employees.xlsx: {col}")
-        st.stop()
 
 # ============================================================
-# ✅ USERS
-# ============================================================
-users = {
-    "admin": {
-        "password": "admin123",
-        "role": "admin",
-        "employee": "ADMIN"
-    }
-}
-
-for _, row in df_emp.iterrows():
-
-    username = str(row["Employee Name"]).split()[0].lower()
-
-    users[username] = {
-        "password": str(row["Password"]),
-        "role": "employee",
-        "employee": row["Employee Name"]
-    }
-
-# ============================================================
-# ✅ LOGIN PAGE
+# 7. LOCATION
 # ============================================================
 
-if not st.session_state["logged_in"]:
+def get_location_values():
+    location = st.session_state.get("location", {})
+    return location.get("lat", "NA"), location.get("lon", "NA")
 
-    st.title("🔐 Login")
+
+def capture_location():
+    if "location" not in st.session_state:
+        st.session_state["location"] = {}
+
+    try:
+        location = streamlit_geolocation()
+
+        if (
+            location
+            and location.get("latitude") is not None
+            and location.get("longitude") is not None
+        ):
+            st.session_state["location"] = {
+                "lat": location["latitude"],
+                "lon": location["longitude"],
+            }
+    except Exception:
+        pass
+
+    return get_location_values()
+
+
+# ============================================================
+# 8. HEADER / LOGIN
+# ============================================================
+
+def get_logo_base64():
+    for path in ["Logo white.png", "logo.png"]:
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as img:
+                    return base64.b64encode(img.read()).decode("utf-8")
+            except Exception:
+                pass
+
+    return ""
+
+
+def render_brand_header(current_user, user_role):
+    now = datetime.now(IST)
+    logo = get_logo_base64()
+
+    logo_html = (
+        f'<img src="data:image/png;base64,{logo}" '
+        f'style="max-height:42px;width:auto;margin-right:14px;">'
+        if logo
+        else '<span style="font-size:2rem;margin-right:12px;">🛡️</span>'
+    )
+
+    st.markdown(
+        f"""
+        <div class="header-card">
+            <div style="display:flex;justify-content:space-between;
+                        align-items:center;gap:20px;">
+                <div style="display:flex;align-items:center;">
+                    {logo_html}
+                    <div>
+                        <div class="header-title">Lancers Risk Consulting</div>
+                        <div class="header-subtitle">
+                            Enterprise HRMS & Workforce Analytics
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="header-user">
+                        Good Morning, {html_text(current_user)} 👋
+                    </div>
+                    <div class="header-date">
+                        {now.strftime("%A, %d %B %Y")} · Role:
+                        <span style="color:#7DD3FC;">
+                            {html_text(user_role.title())}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_login_page():
+    logo = get_logo_base64()
+
+    logo_html = (
+        f'<img src="data:image/png;base64,{logo}" '
+        f'style="max-height:58px;width:auto;">'
+        if logo
+        else '<div style="font-size:3rem;">🛡️</div>'
+    )
+
+    st.markdown(
+        f"""
+        <div class="login-wrap">
+            <div class="login-card">
+                <div style="text-align:center;">{logo_html}</div>
+                <div class="login-brand">Lancers Risk Consulting</div>
+                <div class="login-sub">
+                    Attendance Management & Workforce Analytics
+                </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     username = st.text_input(
         "Username",
-        key="auth_login_user"
+        key="auth_login_user",
+        placeholder="Enter username",
     )
 
     password = st.text_input(
         "Password",
         type="password",
-        key="auth_login_pass"
+        key="auth_login_pass",
+        placeholder="Enter password",
     )
 
     if st.button(
-        "🔑 Login",
-        key="login_btn"
+        "🔐 Sign In",
+        key="login_btn",
+        type="primary",
+        use_container_width=True,
     ):
+        username_clean = username.lower().strip()
 
-        if (
-            username in users
-            and users[username]["password"] == password
-        ):
+        if username_clean in st.session_state["users"]:
+            account = st.session_state["users"][username_clean]
 
-            st.session_state["logged_in"] = True
-            st.session_state["role"] = users[username]["role"]
-            st.session_state["employee"] = users[username]["employee"]
+            if account["password"] == password:
+                st.session_state["logged_in"] = True
+                st.session_state["role"] = account["role"]
+                st.session_state["employee"] = account["employee"]
+                st.rerun()
 
-            st.rerun()
-
-        else:
-
-            st.error("❌ Invalid Credentials")
-
-    st.stop()
-
-# ============================================================
-# ✅ LOGOUT
-# ============================================================
-if st.button("Logout", key="main_app_logout_btn"):
-
-    st.session_state.clear()
-
-    st.rerun()
-
-role = st.session_state.get("role", "")
-
-employee = st.session_state.get(
-    "employee",
-    ""
-)
-
-# ✅ ADD THIS
-ADMIN_USERS = ["ADMIN"]
-
-st.markdown(f"<h4 style='text-align: center;'>Welcome, {employee}</h4>", unsafe_allow_html=True)
-
-# ✅ Show logged in user
-col1, col2 = st.columns([6, 1])
-
-with col1:
-    st.success(f"✅ Logged in as: {employee}")
-
-# ============================================================
-# ✅ LOCATION INITIALIZATION + FETCH
-# ============================================================
-
-if "location" not in st.session_state:
-    st.session_state["location"] = {}
-
-location = streamlit_geolocation()
-
-if location and location.get("latitude") and location.get("longitude"):
-    st.session_state["location"] = {
-        "lat": location["latitude"],
-        "lon": location["longitude"]
-    }
-
-# ============================================================
-# ✅ SINGLE SOURCE OF TRUTH FOR LOCATION
-# ============================================================
-
-def get_location_values():
-
-    loc = st.session_state.get("location", {})
-
-    lat = loc.get("lat") or "NA"
-    lon = loc.get("lon") or "NA"
-
-    return lat, lon
-
-# ============================================================
-# ✅ STEP 3: DISPLAY LOCATION
-# ============================================================
-
-# ✅ Get latest values FIRST (IMPORTANT ✅)
-lat, lon = get_location_values()
-
-st.write("📍 Current Location:")
-
-st.write(f"Latitude: {lat}")
-st.write(f"Longitude: {lon}")
-
-# ============================================================
-# ✅ GOOGLE MAPS LINK
-# ============================================================
-
-if lat != "NA" and lon != "NA":
+        st.error("❌ Invalid username or password.")
 
     st.markdown(
-        f"[🌍 Open in Google Maps](https://www.google.com/maps?q={lat},{lon})"
+        """
+            </div>
+            <div style="text-align:center;color:#94A3B8;
+                        font-size:.7rem;margin-top:12px;">
+                Secure Corporate Attendance Portal
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    st.success("📍 Location captured successfully ✅")
-
-else:
-
-    st.warning("⚠ Please allow location access in your browser")
 
 # ============================================================
-# ✅ DATE SELECTION
+# 9. SIDEBAR
 # ============================================================
-today = date.today()
 
-if role == "employee":
+def render_sidebar():
+    role = st.session_state["role"]
 
-    selected_date = st.date_input(
-        "Attendance Date",
-        today,
-        today,
-        today,
-        key="emp_date_selector"
+    with st.sidebar:
+        st.markdown("## 🛡️ Lancers")
+        st.caption("Attendance Management System")
+        st.divider()
+
+        pages = [
+            "📊 Dashboard",
+            "⏱️ Clock In / Out",
+            "📋 Attendance Records",
+            "👤 Employee Profile",
+            "🏖️ Leave Management",
+            "📈 Analytics",
+            "📑 Reports & Export",
+        ]
+
+        if role == "admin":
+            pages += [
+                "🏢 Department Analysis",
+                "📍 Location Tracker",
+                "⚙️ Admin Control Panel",
+            ]
+
+        current = st.session_state.get("page", pages[0])
+
+        if current not in pages:
+            current = pages[0]
+
+        page = st.radio(
+            "Navigation",
+            pages,
+            index=pages.index(current),
+            label_visibility="collapsed",
+            key="main_navigation",
+        )
+
+        st.session_state["page"] = page
+
+        st.divider()
+
+        st.markdown(
+            f"""
+            <div class="small-muted">LOGGED-IN USER</div>
+            <div style="font-weight:800;color:#0F172A;margin-top:4px;">
+                {html_text(st.session_state["employee"])}
+            </div>
+            <div class="small-muted">
+                {html_text(role.title())}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.button(
+            "🚪 Logout",
+            key="main_app_logout_btn",
+            use_container_width=True,
+        ):
+            st.session_state.clear()
+            st.rerun()
+
+
+# ============================================================
+# 10. DATA HELPERS FOR DASHBOARD
+# ============================================================
+
+def prepare_attendance(df_att):
+    df = df_att.copy()
+
+    for col in ATTENDANCE_HEADERS:
+        if col not in df.columns:
+            df[col] = ""
+
+    if df.empty:
+        df["Date_dt"] = pd.Series(dtype="datetime64[ns]")
+        return df
+
+    df["Date_dt"] = pd.to_datetime(
+        df["Date"],
+        dayfirst=True,
+        format="mixed",
+        errors="coerce",
     )
 
-else:
-
-    selected_date = st.date_input(
-        "Attendance Date",
-        today,
-        key="admin_date_selector"
+    df["Employee"] = df["Employee"].apply(norm_name)
+    df["Status"] = df["Status"].apply(
+        lambda x: clean_text(x, "In Progress")
+    )
+    df["Type"] = df["Type"].apply(
+        lambda x: clean_text(x, "WFO")
     )
 
-date_str = selected_date.strftime("%d-%m-%y")
+    return df
 
-# ============================================================
-# ✅ ADMIN EMPLOYEE SELECTION
-# ============================================================
-if role == "admin":
 
-    employee = st.selectbox(
-        "Select Employee",
-        sorted(df_emp["Employee Name"].unique()),
-        key="employee_filter_admin"
-    )
+def get_employee_names(df_emp, df_att):
+    if not df_emp.empty and "Employee Name" in df_emp.columns:
+        names = (
+            df_emp["Employee Name"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .tolist()
+        )
+    elif not df_att.empty:
+        names = (
+            df_att["Employee"]
+            .dropna()
+            .astype(str)
+            .tolist()
+        )
+    else:
+        names = []
 
-# ============================================================
-# ✅ ATTENDANCE TYPE & AUTO-DETECTION FOR WO / HO
-# ============================================================
+    return sorted(set(names), key=str.lower)
 
-is_wknd, holiday_name = check_date_type(selected_date)
 
-# Determine default option based on date
-options = [
-    "Present WFO",
-    "Present WFH",
-    "Half Day",
-    "Leave",
-    "Week Off (WO)",
-    "Holiday (HO)"
-]
+def approved_leave_employees(df_leave, target_date):
+    if df_leave.empty:
+        return set()
 
-default_idx = 0
+    target = target_date.strftime("%d-%m-%y")
 
-if holiday_name:
-    default_idx = 5  # "Holiday (HO)"
-    st.info(f"🎉 Selected date is an official holiday: **{holiday_name}**")
-elif is_wknd:
-    default_idx = 4  # "Week Off (WO)"
-    st.info(f"🏖 Selected date falls on a Weekend (**{selected_date.strftime('%A')}**)")
-
-attendance_type = st.selectbox(
-    "Attendance Type",
-    options,
-    index=default_idx,
-    key="attendance_type_selector"
-)
-
-# ============================================================
-# ✅ ACTION BUTTONS
-# ============================================================
-
-col1, col2, col3 = st.columns(3)
-
-# ============================================================
-# ✅ LOGIN ATTENDANCE (FINAL CLEAN VERSION ✅)
-# ============================================================
-
-with col1:
-
-    if st.button(
-        "🔑 Login",
-        key="login_att_action_btn"
-    ):
-
-        # ✅ CURRENT TIME
-        login_time_str = get_ist().strftime("%H:%M:%S")
-
-        # ✅ DATE
-        date_str = selected_date.strftime("%d-%m-%y")
-
-        # ✅ NORMALIZE EMPLOYEE
-        employee_clean = str(employee).strip().upper()
-
-        # ====================================================
-        # ✅ CHECK APPROVED LEAVE
-        # ====================================================
-
-        leave_df = load_leave()
-
-        approved_leave = leave_df[
-            (
-                leave_df["Employee"]
-                .astype(str)
-                .str.strip()
-                .str.upper()
-                == employee_clean
-            ) &
-            (
-                leave_df["Date"]
-                .astype(str)
-                .str[:10]
-                == date_str
-            ) &
-            (
-                leave_df["Status"]
+    return set(
+        df_leave.loc[
+            (df_leave["Date"] == target)
+            & (
+                df_leave["Status"]
                 .astype(str)
                 .str.strip()
                 .str.upper()
                 == "APPROVED"
-            )
+            ),
+            "Employee",
         ]
-
-        if not approved_leave.empty:
-
-            if role != "admin":
-
-                st.error(
-                    "❌ Approved leave exists for today.\n"
-                    "Attendance cannot be marked.\n"
-                    "Please contact Admin if attendance is required."
-                )
-
-                st.stop()
-
-            else:
-
-                st.warning(
-                    f"⚠ {employee} has an approved leave for {date_str}.\n"
-                    "Admin override allowed."
-                )
-
-        # ✅ LOCATION
-        lat, lon = get_location_values()
-
-        if lat is None:
-            lat = "NA"
-
-        if lon is None:
-            lon = "NA"
-
-        # ✅ CONNECT SHEET
-        sheet, _ = connect_sheet()
-
-        # ✅ LOAD LATEST DATA
-        st.cache_data.clear()
-
-        df = load_attendance()
-
-        # ✅ CLEAN DATA (SAFE)
-        if df.empty:
-
-            df = pd.DataFrame(
-                columns=["Date", "Employee", "Logout"]
-            )
-
-        df.columns = df.columns.str.strip()
-
-        if "Employee" in df.columns:
-
-            df["Employee"] = (
-                df["Employee"]
-                .astype(str)
-                .str.strip()
-                .str.upper()
-            )
-
-        # ====================================================
-        # ✅ PREVENT DUPLICATE LOGIN
-        # ====================================================
-
-        existing_today = df[
-            (df["Date"] == date_str) &
-            (df["Employee"] == employee_clean)
-        ]
-
-        if not existing_today.empty:
-
-            last_logout = str(
-                existing_today.iloc[-1]["Logout"]
-            ).strip()
-
-            if last_logout in ["", "nan", "None"]:
-
-                st.warning(
-                    "⚠ Already logged in today"
-                )
-
-                st.stop()
-
-        # ====================================================
-        # ✅ SAVE LOGIN (STEP 3 INTEGRATED HERE)
-        # ====================================================
-
-        # Determine status automatically based on selected Attendance Type
-        if attendance_type == "Week Off (WO)":
-            row_status = "WO"
-        elif attendance_type == "Holiday (HO)":
-            row_status = "HO"
-        else:
-            row_status = "In Progress"
-
-        is_auto_closed = row_status in ["WO", "HO"]
-
-        try:
-
-            sheet.append_row([
-                date_str,
-                employee,
-                login_time_str,
-                login_time_str if is_auto_closed else "",        # Logout Time
-                "00:00:00" if is_auto_closed else "",            # Working Hours
-                row_status,                                       # Status ("WO", "HO", or "In Progress")
-                attendance_type,
-                lat,
-                lon,
-                lat if is_auto_closed else "",                   # Logout Latitude
-                lon if is_auto_closed else ""                    # Logout Longitude
-            ])
-
-            st.success(
-                f"✅ Attendance Recorded: {attendance_type} ({row_status})"
-            )
-
-        except Exception as e:
-
-            st.error(
-                f"❌ Login failed: {e}"
-            )
-
-            st.stop()
-
-        # ✅ CLEAR CACHE
-        try:
-            st.cache_data.clear()
-        except Exception:
-            pass
-
-        # ✅ REFRESH UI
-        st.rerun()
-
-with col2:
-    if st.button(
-        "🔴 Logout Attendance",
-        key="logout_attendance_btn"
-    ):
-
-        lat, lon = get_location_values()
-
-        sheet, _ = connect_sheet()
-
-        # ✅ Always load fresh data
-        st.cache_data.clear()
-
-        df = load_attendance()
-
-        df.columns = df.columns.str.strip()
-
-        df["Date"] = pd.to_datetime(
-            df["Date"],
-            dayfirst=True, format="mixed", errors="coerce"
-        ).dt.strftime("%d-%m-%y")
-
-        # ✅ Normalize employee names
-        employee_clean = str(employee).strip().upper()
-
-        df["Employee"] = (
-            df["Employee"]
-            .astype(str)
-            .str.strip()
-            .str.upper()
-        )
-
-        today_date = selected_date.strftime("%d-%m-%y")
-
-        user_today = df[
-            (df["Date"] == today_date) &
-            (df["Employee"] == employee_clean)
-        ]
-
-        if user_today.empty:
-            st.warning("⚠ No login record found")
-            st.stop()
-
-        # ✅ Login record found
-        last_index = user_today.index[-1]
-
-        login_str = str(
-            user_today.iloc[-1]["Login"]
-        ).strip()
-
-        login_time = pd.to_datetime(
-            f"{today_date} {login_str}",
-            errors="coerce"
-        )
-
-        logout_time = pd.to_datetime(
-            get_ist(),
-            errors="coerce"
-        )
-
-        if pd.isna(login_time):
-            st.error("❌ Invalid login time")
-            st.stop()
-
-        if pd.isna(logout_time):
-            st.error("❌ Invalid logout time")
-            st.stop()
-
-        existing_logout = str(
-            user_today.iloc[-1]["Logout"]
-        ).strip()
-
-        if existing_logout not in ["", "nan", "None"]:
-            st.warning("⚠ Logout already completed")
-            st.stop()
-
-        try:
-            login_time = login_time.tz_localize(None)
-        except Exception:
-            pass
-
-        try:
-            logout_time = logout_time.tz_localize(None)
-        except Exception:
-            pass
-
-        # ✅ Handle overnight shift
-        if logout_time < login_time:
-            logout_time += pd.Timedelta(days=1)
-
-        time_diff = logout_time - login_time
-
-        total_hours = time_diff.total_seconds() / 3600
-
-        working_hours = str(time_diff).split(".")[0]
-
-        if total_hours >= 8:
-            status = "Full Day"
-        elif total_hours >= 4:
-            status = "Half Day"
-        else:
-            status = "Short Day"
-
-        row_number = last_index + 2
-
-        try:
-
-            sheet.update_cell(
-                row_number,
-                4,
-                logout_time.strftime("%H:%M:%S")
-            )
-
-            sheet.update_cell(
-                row_number,
-                5,
-                working_hours
-            )
-
-            sheet.update_cell(
-                row_number,
-                6,
-                status
-            )
-
-            sheet.update_cell(
-                row_number,
-                10,
-                lat
-            )
-
-            sheet.update_cell(
-                row_number,
-                11,
-                lon
-            )
-
-            st.cache_data.clear()
-
-            st.success(
-                f"""✅ Logout Recorded Successfully
-
-📍 Location: {lat}, {lon}
-⏱ Hours: {working_hours}
-📌 Status: {status}
-"""
-            )
-
-            st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                f"❌ Sheet update failed: {e}"
-            )
-
-            st.stop()
-# ============================================================
-# ✅ TODAY'S ATTENDANCE (IMPROVED & PRODUCTION READY)
-# ============================================================
-
-st.subheader("📋 Today's Attendance")
-
-# ✅ Load attendance using cached data (TTL handles background updates)
-df_today = load_attendance()
-
-if df_today.empty:
-    st.info("No attendance recorded today.")
-else:
-    df_today = df_today.copy()
-    df_today.columns = df_today.columns.str.strip()
-
-    # ✅ 1. Robust Date Normalization (handles DD/MM/YYYY, YYYY/MM/DD, YYYY-MM-DD)
-    df_today["Date"] = pd.to_datetime(
-        df_today["Date"],
-        dayfirst=True,
-        format="mixed",
-        errors="coerce"
-    ).dt.strftime("%d-%m-%y")
-
-    # ✅ 2. Clean & Normalize Employee Column
-    if "Employee" in df_today.columns:
-        df_today["Employee"] = (
-            df_today["Employee"]
-            .astype(str)
-            .str.strip()
-            .str.upper()
-        )
-
-    # ✅ 3. Selected Date Normalization
-    target_date_str = pd.to_datetime(selected_date).strftime("%d-%m-%y")
-
-    # ✅ 4. Determine Active Logged-in User
-    logged_user = st.session_state.get("employee", employee if 'employee' in locals() else "")
-    employee_clean = str(logged_user).strip().upper()
-
-    # ✅ 5. Role-based Filtering
-    if role == "admin":
-        # Admin sees all employee attendance for the target date
-        today_data = df_today[df_today["Date"] == target_date_str]
-    else:
-        # Non-admin sees only their own attendance for the target date
-        today_data = df_today[
-            (df_today["Date"] == target_date_str) &
-            (df_today["Employee"] == employee_clean)
-        ]
-
-    # ✅ 6. Render Data Frame
-    if not today_data.empty:
-        display_df = today_data.copy()
-
-        # Format Login Time cleanly
-        display_df["Login"] = pd.to_datetime(
-            display_df["Login"], errors="coerce"
-        ).dt.strftime("%H:%M:%S").fillna(display_df["Login"].astype(str))
-
-        # Format Logout Time cleanly & handle Pending states
-        display_df["Logout"] = pd.to_datetime(
-            display_df["Logout"], errors="coerce"
-        ).dt.strftime("%H:%M:%S")
-        
-        display_df["Logout"] = (
-            display_df["Logout"]
-            .replace(["nan", "None", "", "NaN"], None)
-            .fillna("Pending")
-        )
-
-        # Fill blank values in working hours / status
-        if "Working Hours" in display_df.columns:
-            display_df["Working Hours"] = display_df["Working Hours"].replace(["", "nan", "None"], "-")
-        if "Status" in display_df.columns:
-            display_df["Status"] = display_df["Status"].replace(["", "nan", "None"], "In Progress")
-
-        # Re-index for serial numbering
-        display_df = display_df.reset_index(drop=True)
-        display_df.insert(0, "S.No", range(1, len(display_df) + 1))
-
-        # Define display column order safely
-        column_order = [
-            "S.No", "Employee", "Login", "Logout", "Working Hours",
-            "Status", "Type", "Login Latitude", "Login Longitude",
-            "Logout Latitude", "Logout Longitude"
-        ]
-        
-        show_cols = [col for col in column_order if col in display_df.columns]
-
-        st.dataframe(
-            display_df[show_cols],
-            use_container_width=True,
-            hide_index=True
-        )
-    else:
-        st.info("No attendance recorded for selected date.")
-
-# ============================================================
-# ✅ ADMIN CONTROLS
-# ============================================================
-
-st.divider()
-
-if role == "admin":
-
-    st.markdown("### ⚠️ Admin Controls")
-
-    # ========================================================
-    # ✅ CLEAR ATTENDANCE
-    # ========================================================
-
-    confirm_clear = st.checkbox(
-        "Confirm Clear Attendance",
-        key="confirm_clear_attendance"
+        .astype(str)
+        .map(norm_name)
     )
 
-    if confirm_clear:
 
-        if st.button(
-            "🧹 Clear Attendance",
-            key="clear_attendance_btn"
-        ):
+def day_frame(df_att, target_date):
+    if df_att.empty:
+        return df_att.copy()
 
-            try:
+    target = target_date.strftime("%d-%m-%y")
+    return df_att[df_att["Date"] == target].copy()
 
+
+def weekly_metrics(df_att, selected_date):
+    start = selected_date - timedelta(
+        days=selected_date.weekday()
+    )
+
+    days = [
+        start + timedelta(days=i)
+        for i in range(7)
+    ]
+
+    hours = []
+    attendance = []
+
+    for day in days:
+        ddf = day_frame(df_att, day)
+
+        hours.append(
+            round(
+                ddf["Working Hours"]
+                .map(working_hours_to_decimal)
+                .sum(),
+                2,
+            )
+        )
+
+        attendance.append(
+            ddf["Employee"].nunique()
+        )
+
+    return days, hours, attendance
+
+
+# ============================================================
+# 11. CHART / KPI HELPERS
+# ============================================================
+
+def chart_base(fig, height=220):
+    fig.update_layout(
+        height=height,
+        margin=dict(
+            l=8,
+            r=8,
+            t=18,
+            b=8,
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(
+            family="Plus Jakarta Sans",
+            color="#64748B",
+        ),
+        showlegend=False,
+    )
+
+    return fig
+
+
+def render_kpi_card(
+    container,
+    title,
+    value,
+    subtitle="",
+    value_class="",
+):
+    container.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-title">
+                {html_text(title)}
+            </div>
+
+            <div class="kpi-value {value_class}">
+                {html_text(value)}
+            </div>
+
+            <div class="kpi-sub">
+                {html_text(subtitle)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# 12. MAIN CORPORATE DASHBOARD
+# ============================================================
+
+def render_dashboard(df_emp, df_att, df_leave):
+    st.markdown("### 📊 Workforce Dashboard")
+
+    f1, f2, f3 = st.columns([1.6, 1.2, 1.2])
+
+    with f1:
+        period = st.selectbox(
+            "Analysis Period",
+            [
+                "Today",
+                "This Week",
+                "This Month",
+                "Previous Month",
+                "Custom Date",
+            ],
+            key="dashboard_period",
+        )
+
+    with f2:
+        if period == "Custom Date":
+            selected_date = st.date_input(
+                "Select Date",
+                value=datetime.now(IST).date(),
+                key="dashboard_custom_date",
+            )
+        else:
+            selected_date = datetime.now(IST).date()
+
+    with f3:
+        weekend, holiday = check_date_type(selected_date)
+
+        if holiday:
+            st.info(f"🎉 {holiday}")
+        elif weekend:
+            st.info("⛱️ Weekend")
+
+    df = prepare_attendance(df_att)
+
+    employees = get_employee_names(
+        df_emp,
+        df,
+    )
+
+    total_headcount = len(employees)
+
+    df_day = day_frame(
+        df,
+        selected_date,
+    )
+
+    present_set = (
+        set(df_day["Employee"].unique())
+        if not df_day.empty
+        else set()
+    )
+
+    leave_set = approved_leave_employees(
+        df_leave,
+        selected_date,
+    )
+
+    present_today = len(present_set)
+
+    leave_today = len(
+        leave_set - present_set
+    )
+
+    weekend, holiday = check_date_type(
+        selected_date
+    )
+
+    if weekend or holiday:
+        absent_today = 0
+    else:
+        absent_today = max(
+            0,
+            total_headcount
+            - present_today
+            - leave_today,
+        )
+
+    wfh_today = (
+        int(
+            df_day["Type"]
+            .astype(str)
+            .str.contains(
+                "WFH",
+                case=False,
+                na=False,
+            )
+            .sum()
+        )
+        if not df_day.empty
+        else 0
+    )
+
+    wfo_today = (
+        int(
+            df_day["Type"]
+            .astype(str)
+            .str.contains(
+                "WFO",
+                case=False,
+                na=False,
+            )
+            .sum()
+        )
+        if not df_day.empty
+        else 0
+    )
+
+    early_cnt = 0
+    ontime_cnt = 0
+    late_cnt = 0
+
+    if not df_day.empty:
+        for login in df_day["Login"].dropna():
+            category = get_lateness_category(
+                login
+            )
+
+            if category == "Early":
+                early_cnt += 1
+            elif category == "Late":
+                late_cnt += 1
+            else:
+                ontime_cnt += 1
+
+    attendance_pct = (
+        round(
+            (present_today / total_headcount) * 100,
+            1,
+        )
+        if total_headcount
+        else 0
+    )
+
+    total_hours_day = (
+        round(
+            df_day["Working Hours"]
+            .map(working_hours_to_decimal)
+            .sum(),
+            1,
+        )
+        if not df_day.empty
+        else 0.0
+    )
+
+    # --------------------------------------------------------
+    # KPI CARDS
+    # --------------------------------------------------------
+
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
+
+    render_kpi_card(
+        k1,
+        "Total Employees",
+        str(total_headcount),
+        "Active employee master",
+    )
+
+    render_kpi_card(
+        k2,
+        "Present Today",
+        str(present_today),
+        f"{attendance_pct}% attendance",
+        "kpi-positive",
+    )
+
+    render_kpi_card(
+        k3,
+        "Absent",
+        str(absent_today),
+        "Excluding approved leave",
+        "kpi-danger",
+    )
+
+    render_kpi_card(
+        k4,
+        "WFH / WFO",
+        f"{wfh_today} / {wfo_today}",
+        "Work location",
+        "kpi-info",
+    )
+
+    render_kpi_card(
+        k5,
+        "Late Arrivals",
+        str(late_cnt),
+        "After 09:35 AM",
+        "kpi-warning",
+    )
+
+    render_kpi_card(
+        k6,
+        "Hours Logged",
+        f"{total_hours_day:.1f}",
+        "Selected day",
+        "kpi-positive",
+    )
+
+    st.markdown(
+        "<div style='height:10px'></div>",
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # REFERENCE-STYLE GRID
+    # --------------------------------------------------------
+
+    left, right = st.columns(
+        [1, 3.2],
+        gap="medium",
+    )
+
+    with left:
+        st.markdown(
+            '<div class="saas-card">',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f"""
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                margin-bottom:8px;
+            ">
+                <div class="section-title"
+                     style="margin:0;">
+                    Employees
+                </div>
+
+                <div style="
+                    font-weight:800;
+                    color:#10B981;
+                ">
+                    {present_today}
+                    <span style="
+                        color:#94A3B8;
+                        font-size:.75rem;
+                    ">
+                        / {total_headcount}
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        search = st.text_input(
+            "Search employee",
+            placeholder="Search name...",
+            label_visibility="collapsed",
+            key="dashboard_employee_search",
+        )
+
+        filtered = [
+            employee
+            for employee in employees
+            if (
+                not search
+                or search.lower()
+                in employee.lower()
+            )
+        ]
+
+        for employee_name in filtered[:80]:
+            employee_norm = norm_name(
+                employee_name
+            )
+
+            if employee_norm in present_set:
+                dot = "dot-green"
+                status = "Present"
+            elif employee_norm in leave_set:
+                dot = "dot-blue"
+                status = "Leave"
+            else:
+                dot = "dot-pink"
+                status = "Absent"
+
+            st.markdown(
+                f"""
+                <div class="emp-item"
+                     title="{status}">
+                    <span class="status-dot {dot}"></span>
+                    <span>
+                        {html_text(
+                            employee_name.title()
+                        )}
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        if len(filtered) > 80:
+            st.caption(
+                f"Showing first 80 of {len(filtered)} employees."
+            )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    with right:
+        week_days, actual_hours, attendance_count = weekly_metrics(
+            df,
+            selected_date,
+        )
+
+        labels = [
+            d.strftime("%a")[0]
+            for d in week_days
+        ]
+
+        # ----------------------------------------------------
+        # TOP CHARTS
+        # ----------------------------------------------------
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.markdown(
+                '<div class="saas-card">',
+                unsafe_allow_html=True,
+            )
+
+            week_total = sum(
+                actual_hours
+            )
+
+            target_hours = (
+                total_headcount * 8 * 5
+            )
+
+            st.markdown(
+                f"""
+                <div style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                ">
+                    <div>
+                        <div class="section-title"
+                             style="margin:0;">
+                            Total Productive Hours
+                        </div>
+
+                        <div class="small-muted">
+                            Current week total
+                        </div>
+                    </div>
+
+                    <div style="
+                        font-size:1.25rem;
+                        font-weight:800;
+                        color:#10B981;
+                    ">
+                        {week_total:.1f}
+
+                        <span style="
+                            font-size:.75rem;
+                            color:#94A3B8;
+                        ">
+                            / {target_hours} hrs
+                        </span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            fig = go.Figure()
+
+            fig.add_trace(
+                go.Bar(
+                    x=labels,
+                    y=actual_hours,
+                    marker_color="#F5B914",
+                    width=0.42,
+                    hovertemplate=(
+                        "%{x}: %{y:.1f} hrs"
+                        "<extra></extra>"
+                    ),
+                )
+            )
+
+            fig.update_xaxes(
+                showgrid=False,
+                zeroline=False,
+            )
+
+            fig.update_yaxes(
+                showgrid=True,
+                gridcolor="#EEF2F7",
+                zeroline=False,
+            )
+
+            chart_base(fig, 235)
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                config={
+                    "displayModeBar": False
+                },
+            )
+
+            st.markdown(
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        with c2:
+            st.markdown(
+                '<div class="saas-card">',
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                f"""
+                <div style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                ">
+                    <div>
+                        <div class="section-title"
+                             style="margin:0;">
+                            Total Attendance
+                        </div>
+
+                        <div class="small-muted">
+                            Daily headcount · current week
+                        </div>
+                    </div>
+
+                    <div style="
+                        font-size:1.25rem;
+                        font-weight:800;
+                        color:#10B981;
+                    ">
+                        {present_today}
+
+                        <span style="
+                            font-size:.75rem;
+                            color:#94A3B8;
+                        ">
+                            today
+                        </span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            fig = go.Figure()
+
+            fig.add_trace(
+                go.Scatter(
+                    x=labels,
+                    y=attendance_count,
+                    mode="lines+markers",
+                    line=dict(
+                        color="#F5B914",
+                        width=3,
+                    ),
+                    marker=dict(
+                        size=7,
+                        color="#F5B914",
+                    ),
+                    hovertemplate=(
+                        "%{x}: %{y} employees"
+                        "<extra></extra>"
+                    ),
+                )
+            )
+
+            fig.update_xaxes(
+                showgrid=False,
+                zeroline=False,
+            )
+
+            fig.update_yaxes(
+                showgrid=True,
+                gridcolor="#EEF2F7",
+                zeroline=False,
+            )
+
+            chart_base(fig, 235)
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                config={
+                    "displayModeBar": False
+                },
+            )
+
+            st.markdown(
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        # ----------------------------------------------------
+        # SECOND ROW
+        # ----------------------------------------------------
+
+        r2c1, r2c2, r2c3 = st.columns(
+            [1.15, 1.15, 1.6]
+        )
+
+        with r2c1:
+            st.markdown(
+                '<div class="saas-card">',
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                '<div class="section-title">Lateness</div>',
+                unsafe_allow_html=True,
+            )
+
+            fig = go.Figure(
+                go.Bar(
+                    x=[
+                        early_cnt,
+                        ontime_cnt,
+                        late_cnt,
+                    ],
+                    y=[
+                        "Early",
+                        "On-time",
+                        "Late",
+                    ],
+                    orientation="h",
+                    marker_color=[
+                        "#F5B914",
+                        "#10B981",
+                        "#EC4899",
+                    ],
+                    text=[
+                        early_cnt,
+                        ontime_cnt,
+                        late_cnt,
+                    ],
+                    textposition="outside",
+                    hovertemplate=(
+                        "%{y}: %{x}"
+                        "<extra></extra>"
+                    ),
+                )
+            )
+
+            fig.update_xaxes(
+                showgrid=False,
+                zeroline=False,
+            )
+
+            fig.update_yaxes(
+                showgrid=False,
+                zeroline=False,
+            )
+
+            chart_base(fig, 205)
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                config={
+                    "displayModeBar": False
+                },
+            )
+
+            st.markdown(
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        with r2c2:
+            st.markdown(
+                '<div class="saas-card">',
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                '<div class="section-title">Attendance Status</div>',
+                unsafe_allow_html=True,
+            )
+
+            status_map = {
+                "Present": present_today,
+                "Absent": absent_today,
+                "Leave": leave_today,
+                "WFH": wfh_today,
+                "WFO": wfo_today,
+            }
+
+            status_map = {
+                key: value
+                for key, value
+                in status_map.items()
+                if value > 0
+            }
+
+            if not status_map:
+                status_map = {
+                    "No Data": 1
+                }
+
+            fig = go.Figure(
+                data=[
+                    go.Pie(
+                        labels=list(
+                            status_map.keys()
+                        ),
+                        values=list(
+                            status_map.values()
+                        ),
+                        hole=0.62,
+                        textinfo="none",
+                        marker=dict(
+                            colors=[
+                                "#10B981",
+                                "#EC4899",
+                                "#8B5CF6",
+                                "#3B82F6",
+                                "#22C55E",
+                                "#E5E7EB",
+                            ]
+                        ),
+                    )
+                ]
+            )
+
+            fig.add_annotation(
+                text=(
+                    f"<b>{present_today}</b>"
+                    "<br>"
+                    "<span style='font-size:11px'>"
+                    "Present"
+                    "</span>"
+                ),
+                showarrow=False,
+            )
+
+            chart_base(fig, 205)
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                config={
+                    "displayModeBar": False
+                },
+            )
+
+            st.markdown(
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        with r2c3:
+            m1, m2 = st.columns(2)
+
+            pending = (
+                int(
+                    (
+                        df_day["Status"]
+                        .astype(str)
+                        .str.upper()
+                        == "IN PROGRESS"
+                    ).sum()
+                )
+                if not df_day.empty
+                else 0
+            )
+
+            cumulative_hours = (
+                round(
+                    df["Working Hours"]
+                    .map(
+                        working_hours_to_decimal
+                    )
+                    .sum(),
+                    1,
+                )
+                if not df.empty
+                else 0
+            )
+
+            render_kpi_card(
+                m1,
+                "Total Hours",
+                f"{cumulative_hours:.1f}",
+                "Cumulative logged hours",
+                "kpi-positive",
+            )
+
+            render_kpi_card(
+                m2,
+                "Active Attendance",
+                f"{present_today}/{total_headcount}",
+                "Present today",
+                "kpi-positive",
+            )
+
+            st.markdown(
+                "<div style='height:10px'></div>",
+                unsafe_allow_html=True,
+            )
+
+            render_kpi_card(
+                m1,
+                "Employees Late",
+                str(late_cnt),
+                "After 09:35 AM",
+                "kpi-danger",
+            )
+
+            render_kpi_card(
+                m2,
+                "Pending Clock-Outs",
+                str(pending),
+                "Still in progress",
+                "kpi-warning",
+            )
+
+    # --------------------------------------------------------
+    # TODAY'S ACTIVITY
+    # --------------------------------------------------------
+
+    st.markdown(
+        "### 🕘 Today's Attendance Activity"
+    )
+
+    if df_day.empty:
+        st.info(
+            "No attendance records for the selected date."
+        )
+    else:
+        activity = df_day.copy()
+        activity.insert(
+            0,
+            "S.No",
+            range(1, len(activity) + 1),
+        )
+
+        cols = [
+            c
+            for c in [
+                "S.No",
+                "Employee",
+                "Login",
+                "Logout",
+                "Working Hours",
+                "Status",
+                "Type",
+            ]
+            if c in activity.columns
+        ]
+
+        st.dataframe(
+            activity[cols],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+# ============================================================
+# 13. CLOCK IN / OUT
+# ============================================================
+
+def render_clock_in_out(df_att):
+    st.markdown(
+        "### ⏱️ Daily Attendance Punch"
+    )
+
+    user = norm_name(
+        st.session_state["employee"]
+    )
+
+    today = datetime.now(IST).date()
+    today_str = today.strftime("%d-%m-%y")
+
+    df = prepare_attendance(df_att)
+
+    user_today = (
+        df[
+            (df["Date"] == today_str)
+            & (df["Employee"] == user)
+        ]
+        if not df.empty
+        else pd.DataFrame()
+    )
+
+    c1, c2 = st.columns(
+        [1.6, 1]
+    )
+
+    with c1:
+        st.markdown(
+            f"""
+            <div class="saas-card">
+                <div class="section-title">
+                    Employee Punch Terminal
+                </div>
+
+                <div class="small-muted">
+                    Employee:
+                    <b>
+                        {html_text(
+                            st.session_state["employee"]
+                        )}
+                    </b>
+                    &nbsp; · &nbsp;
+                    Date:
+                    <b>{today_str}</b>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        work_mode = st.selectbox(
+            "Attendance Type",
+            [
+                "Present WFO",
+                "Present WFH",
+                "Client Site Visit",
+            ],
+            key="clock_work_mode",
+        )
+
+        lat, lon = capture_location()
+
+        loc1, loc2 = st.columns(2)
+
+        with loc1:
+            st.metric(
+                "Latitude",
+                clean_text(lat, "NA"),
+            )
+
+        with loc2:
+            st.metric(
+                "Longitude",
+                clean_text(lon, "NA"),
+            )
+
+        if lat != "NA" and lon != "NA":
+            st.success(
+                "📍 Location captured successfully."
+            )
+
+            st.markdown(
+                f"[🌍 Open current location in Google Maps]"
+                f"(https://www.google.com/maps?q={lat},{lon})"
+            )
+        else:
+            st.warning(
+                "Please allow location access in your browser "
+                "if GPS capture is required."
+            )
+
+        # ----------------------------------------------------
+        # CLOCK IN
+        # ----------------------------------------------------
+
+        if user_today.empty:
+            if st.button(
+                "🚀 Punch Clock-In Now",
+                key="punch_clock_in",
+                type="primary",
+                use_container_width=True,
+            ):
                 sheet, _ = connect_sheet()
 
-                sheet.clear()
+                clear_data_cache()
 
-                sheet.append_row([
-                    "Date",
-                    "Employee",
-                    "Login",
-                    "Logout",
-                    "Working Hours",
-                    "Status",
-                    "Type",
-                    "Login Latitude",
-                    "Login Longitude",
-                    "Logout Latitude",
-                    "Logout Longitude"
-                ])
+                fresh = prepare_attendance(
+                    load_attendance()
+                )
+
+                duplicate = (
+                    fresh[
+                        (fresh["Date"] == today_str)
+                        & (fresh["Employee"] == user)
+                    ]
+                    if not fresh.empty
+                    else pd.DataFrame()
+                )
+
+                if not duplicate.empty:
+                    last_logout = clean_text(
+                        duplicate.iloc[-1]["Logout"]
+                    )
+
+                    if not last_logout:
+                        st.warning(
+                            "⚠ You are already clocked in today."
+                        )
+                        st.stop()
 
                 try:
-                    st.cache_data.clear()
-                except Exception:
-                    pass
+                    sheet.append_row(
+                        [
+                            today_str,
+                            user,
+                            get_ist().strftime(
+                                "%H:%M:%S"
+                            ),
+                            "",
+                            "",
+                            "In Progress",
+                            work_mode,
+                            lat,
+                            lon,
+                            "",
+                            "",
+                        ]
+                    )
+
+                    clear_data_cache()
+
+                    st.success(
+                        "✅ Clock-In recorded successfully."
+                    )
+
+                    st.rerun()
+
+                except Exception as exc:
+                    st.error(
+                        f"❌ Clock-In failed: {exc}"
+                    )
+
+        # ----------------------------------------------------
+        # CLOCK OUT
+        # ----------------------------------------------------
+
+        else:
+            row = user_today.iloc[-1]
+
+            login = clean_text(
+                row["Login"]
+            )
+
+            logout = clean_text(
+                row["Logout"]
+            )
+
+            if not logout:
+                st.warning(
+                    f"⏳ You are clocked in since "
+                    f"**{login}**."
+                )
+
+                if st.button(
+                    "🛑 Punch Clock-Out Now",
+                    key="punch_clock_out",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    sheet, _ = connect_sheet()
+
+                    clear_data_cache()
+
+                    fresh = prepare_attendance(
+                        load_attendance()
+                    )
+
+                    matches = (
+                        fresh[
+                            (fresh["Date"] == today_str)
+                            & (fresh["Employee"] == user)
+                        ]
+                        if not fresh.empty
+                        else pd.DataFrame()
+                    )
+
+                    if matches.empty:
+                        st.error(
+                            "❌ Active login record not found."
+                        )
+                        st.stop()
+
+                    idx = matches.index[-1]
+
+                    login = clean_text(
+                        fresh.loc[idx, "Login"]
+                    )
+
+                    now_str = get_ist().strftime(
+                        "%H:%M:%S"
+                    )
+
+                    duration, hours_dec = (
+                        calculate_duration_str(
+                            login,
+                            now_str,
+                        )
+                    )
+
+                    status = determine_attendance_status(
+                        hours_dec
+                    )
+
+                    row_number = int(idx) + 2
+
+                    try:
+                        sheet.update_cell(
+                            row_number,
+                            4,
+                            now_str,
+                        )
+
+                        sheet.update_cell(
+                            row_number,
+                            5,
+                            duration,
+                        )
+
+                        sheet.update_cell(
+                            row_number,
+                            6,
+                            status,
+                        )
+
+                        sheet.update_cell(
+                            row_number,
+                            10,
+                            lat,
+                        )
+
+                        sheet.update_cell(
+                            row_number,
+                            11,
+                            lon,
+                        )
+
+                        clear_data_cache()
+
+                        st.success(
+                            f"✅ Clock-Out recorded. "
+                            f"Hours: {duration} · "
+                            f"Status: {status}"
+                        )
+
+                        st.rerun()
+
+                    except Exception as exc:
+                        st.error(
+                            f"❌ Clock-Out update failed: {exc}"
+                        )
+
+            else:
+                st.success(
+                    f"🎉 Shift completed · "
+                    f"In: {login} · "
+                    f"Out: {logout} · "
+                    f"Hours: "
+                    f"{clean_text(row['Working Hours'], '00:00:00')} · "
+                    f"Status: "
+                    f"{clean_text(row['Status'], 'Completed')}"
+                )
+
+    with c2:
+        st.markdown(
+            """
+            <div class="saas-card">
+                <div class="section-title">
+                    Shift Policies & Rules
+                </div>
+
+                <ul style="
+                    font-size:.82rem;
+                    color:#64748B;
+                    line-height:1.8;
+                    padding-left:18px;
+                ">
+                    <li><b>Shift Start:</b> 09:30 AM</li>
+                    <li><b>Grace Period:</b> Up to 09:35 AM</li>
+                    <li><b>Early:</b> Before 09:15 AM</li>
+                    <li><b>On Time:</b> 09:15 AM – 09:35 AM</li>
+                    <li><b>Late:</b> After 09:35 AM</li>
+                    <li><b>Full Day:</b> ≥ 8 hours</li>
+                    <li><b>Half Day:</b> ≥ 4 hours and &lt; 8 hours</li>
+                    <li><b>Short Day:</b> &lt; 4 hours</li>
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# 14. ATTENDANCE RECORDS
+# ============================================================
+
+def render_attendance_records(df_att):
+    st.markdown(
+        "### 📋 Attendance Records"
+    )
+
+    df = prepare_attendance(
+        df_att
+    )
+
+    if st.session_state["role"] != "admin":
+        df = df[
+            df["Employee"]
+            == norm_name(
+                st.session_state["employee"]
+            )
+        ]
+
+    if df.empty:
+        st.info(
+            "No attendance records found."
+        )
+        return
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        emp_options = [
+            "All Employees"
+        ] + sorted(
+            df["Employee"]
+            .unique()
+            .tolist()
+        )
+
+        emp_filter = st.selectbox(
+            "Employee",
+            emp_options,
+            key="records_emp_filter",
+        )
+
+    with c2:
+        status_options = [
+            "All Statuses"
+        ] + sorted(
+            df["Status"]
+            .unique()
+            .tolist()
+        )
+
+        status_filter = st.selectbox(
+            "Status",
+            status_options,
+            key="records_status_filter",
+        )
+
+    with c3:
+        type_options = [
+            "All Types"
+        ] + sorted(
+            df["Type"]
+            .unique()
+            .tolist()
+        )
+
+        type_filter = st.selectbox(
+            "Type",
+            type_options,
+            key="records_type_filter",
+        )
+
+    filtered = df.copy()
+
+    if emp_filter != "All Employees":
+        filtered = filtered[
+            filtered["Employee"]
+            == emp_filter
+        ]
+
+    if status_filter != "All Statuses":
+        filtered = filtered[
+            filtered["Status"]
+            == status_filter
+        ]
+
+    if type_filter != "All Types":
+        filtered = filtered[
+            filtered["Type"]
+            == type_filter
+        ]
+
+    show_cols = [
+        c
+        for c in [
+            "Date",
+            "Employee",
+            "Login",
+            "Logout",
+            "Working Hours",
+            "Status",
+            "Type",
+            "Login Latitude",
+            "Login Longitude",
+            "Logout Latitude",
+            "Logout Longitude",
+        ]
+        if c in filtered.columns
+    ]
+
+    st.dataframe(
+        filtered[show_cols],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.download_button(
+        "⬇ Download Filtered CSV",
+        data=filtered.to_csv(
+            index=False
+        ).encode("utf-8"),
+        file_name=(
+            f"Attendance_Export_"
+            f"{datetime.now().strftime('%d%m%Y')}.csv"
+        ),
+        mime="text/csv",
+        key="records_download",
+    )
+
+
+# ============================================================
+# 15. EMPLOYEE PROFILE
+# ============================================================
+
+def render_employee_profile(df_emp, df_att):
+    st.markdown(
+        "### 👤 Employee Attendance Profile"
+    )
+
+    employees = get_employee_names(
+        df_emp,
+        df_att,
+    )
+
+    if not employees:
+        st.info(
+            "No employees available."
+        )
+        return
+
+    if st.session_state["role"] == "admin":
+        selected = st.selectbox(
+            "Select Employee",
+            employees,
+            key="profile_employee",
+        )
+    else:
+        selected = norm_name(
+            st.session_state["employee"]
+        )
+
+    master = (
+        df_emp[
+            df_emp["Employee Name"]
+            .astype(str)
+            .map(norm_name)
+            == norm_name(selected)
+        ]
+        if not df_emp.empty
+        else pd.DataFrame()
+    )
+
+    att = prepare_attendance(
+        df_att
+    )
+
+    if not att.empty:
+        att = att[
+            att["Employee"]
+            == norm_name(selected)
+        ]
+
+    c1, c2 = st.columns(
+        [1, 2.5]
+    )
+
+    with c1:
+        def master_value(
+            column,
+            fallback="N/A",
+        ):
+            if (
+                not master.empty
+                and column in master.columns
+            ):
+                return clean_text(
+                    master.iloc[0][column],
+                    fallback,
+                )
+
+            return fallback
+
+        st.markdown(
+            f"""
+            <div class="saas-card">
+                <div style="text-align:center;">
+                    <div style="font-size:2.7rem;">
+                        👤
+                    </div>
+
+                    <div style="
+                        font-size:1.1rem;
+                        font-weight:800;
+                        color:#0F172A;
+                    ">
+                        {html_text(
+                            str(selected).title()
+                        )}
+                    </div>
+
+                    <div class="small-muted">
+                        {html_text(
+                            master_value(
+                                "Designation"
+                            )
+                        )}
+                        ·
+                        {html_text(
+                            master_value(
+                                "Department"
+                            )
+                        )}
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="small-muted">
+                    <b>Employee ID:</b>
+                    {html_text(
+                        master_value(
+                            "Employee ID"
+                        )
+                    )}
+                </div>
+
+                <div class="small-muted"
+                     style="margin-top:7px;">
+                    <b>Manager:</b>
+                    {html_text(
+                        master_value(
+                            "Reporting Manager"
+                        )
+                    )}
+                </div>
+
+                <div class="small-muted"
+                     style="margin-top:7px;">
+                    <b>Joining Date:</b>
+                    {html_text(
+                        master_value(
+                            "Joining Date"
+                        )
+                    )}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with c2:
+        total = len(att)
+
+        full = (
+            int(
+                (
+                    att["Status"]
+                    == "Full Day"
+                ).sum()
+            )
+            if not att.empty
+            else 0
+        )
+
+        half = (
+            int(
+                (
+                    att["Status"]
+                    == "Half Day"
+                ).sum()
+            )
+            if not att.empty
+            else 0
+        )
+
+        late = (
+            int(
+                sum(
+                    get_lateness_category(
+                        value
+                    )
+                    == "Late"
+                    for value
+                    in att["Login"].dropna()
+                )
+            )
+            if not att.empty
+            else 0
+        )
+
+        p1, p2, p3, p4 = st.columns(4)
+
+        p1.metric(
+            "Total Shifts",
+            total,
+        )
+
+        p2.metric(
+            "Full Days",
+            full,
+        )
+
+        p3.metric(
+            "Half Days",
+            half,
+        )
+
+        p4.metric(
+            "Late",
+            late,
+        )
+
+        st.markdown(
+            "#### Recent Attendance"
+        )
+
+        if att.empty:
+            st.info(
+                "No attendance records found "
+                "for this employee."
+            )
+        else:
+            st.dataframe(
+                att[
+                    [
+                        "Date",
+                        "Login",
+                        "Logout",
+                        "Working Hours",
+                        "Status",
+                        "Type",
+                    ]
+                ].sort_values(
+                    "Date",
+                    ascending=False,
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
+# ============================================================
+# 16. ANALYTICS
+# ============================================================
+
+def render_analytics(df_att):
+    st.markdown(
+        "### 📈 Workforce Analytics"
+    )
+
+    df = prepare_attendance(
+        df_att
+    )
+
+    if df.empty:
+        st.info(
+            "No attendance data available "
+            "for analytics."
+        )
+        return
+
+    df["Date_dt"] = pd.to_datetime(
+        df["Date"],
+        dayfirst=True,
+        format="mixed",
+        errors="coerce",
+    )
+
+    df["Hours"] = (
+        df["Working Hours"]
+        .map(working_hours_to_decimal)
+    )
+
+    df["Month"] = (
+        df["Date_dt"]
+        .dt
+        .strftime("%Y-%m")
+    )
+
+    month_options = sorted(
+        df["Month"]
+        .dropna()
+        .unique()
+        .tolist(),
+        reverse=True,
+    )
+
+    if not month_options:
+        st.info(
+            "No valid dates found."
+        )
+        return
+
+    selected_month = st.selectbox(
+        "Select Month",
+        month_options,
+        key="analytics_month",
+    )
+
+    month_df = df[
+        df["Month"]
+        == selected_month
+    ].copy()
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        status_counts = (
+            month_df["Status"]
+            .value_counts()
+        )
+
+        fig = go.Figure(
+            go.Bar(
+                x=status_counts.index,
+                y=status_counts.values,
+                marker_color="#10B981",
+                hovertemplate=(
+                    "%{x}: %{y}"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+        fig.update_xaxes(
+            showgrid=False
+        )
+
+        fig.update_yaxes(
+            showgrid=True,
+            gridcolor="#EEF2F7",
+        )
+
+        fig.update_layout(
+            title="Monthly Attendance Classification"
+        )
+
+        chart_base(fig, 320)
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={
+                "displayModeBar": False
+            },
+        )
+
+    with c2:
+        daily = (
+            month_df
+            .groupby(
+                "Date",
+                as_index=False,
+            )["Hours"]
+            .sum()
+        )
+
+        fig = go.Figure(
+            go.Scatter(
+                x=daily["Date"],
+                y=daily["Hours"],
+                mode="lines+markers",
+                line=dict(
+                    color="#F5B914",
+                    width=3,
+                ),
+                marker=dict(
+                    color="#F5B914",
+                    size=6,
+                ),
+                hovertemplate=(
+                    "%{x}: %{y:.1f} hrs"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+        fig.update_xaxes(
+            showgrid=False
+        )
+
+        fig.update_yaxes(
+            showgrid=True,
+            gridcolor="#EEF2F7",
+        )
+
+        fig.update_layout(
+            title="Working Hours Trend"
+        )
+
+        chart_base(fig, 320)
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True,
+            config={
+                "displayModeBar": False
+            },
+        )
+
+
+# ============================================================
+# 17. DEPARTMENT ANALYSIS
+# ============================================================
+
+def render_department_analysis(
+    df_emp,
+    df_att,
+):
+    st.markdown(
+        "### 🏢 Department Analysis"
+    )
+
+    df = prepare_attendance(
+        df_att
+    )
+
+    if df.empty:
+        st.info(
+            "No attendance data available."
+        )
+        return
+
+    if (
+        not df_emp.empty
+        and "Department"
+        in df_emp.columns
+    ):
+        master = df_emp[
+            [
+                "Employee Name",
+                "Department",
+            ]
+        ].copy()
+
+        master["Employee"] = (
+            master["Employee Name"]
+            .map(norm_name)
+        )
+
+        df = df.merge(
+            master[
+                [
+                    "Employee",
+                    "Department",
+                ]
+            ],
+            on="Employee",
+            how="left",
+            suffixes=(
+                "",
+                "_master",
+            ),
+        )
+
+        if (
+            "Department_master"
+            in df.columns
+        ):
+            df["Department"] = (
+                df[
+                    "Department_master"
+                ]
+                .fillna(
+                    df.get(
+                        "Department",
+                        "General",
+                    )
+                )
+            )
+
+            df.drop(
+                columns=[
+                    "Department_master"
+                ],
+                inplace=True,
+            )
+
+    if "Department" not in df.columns:
+        df["Department"] = "General"
+
+    summary = (
+        df.groupby("Department")
+        .agg(
+            Employees=(
+                "Employee",
+                "nunique",
+            ),
+            Attendance_Records=(
+                "Employee",
+                "size",
+            ),
+            Hours=(
+                "Working Hours",
+                lambda s: round(
+                    s.map(
+                        working_hours_to_decimal
+                    ).sum(),
+                    1,
+                ),
+            ),
+        )
+        .reset_index()
+        .sort_values(
+            "Employees",
+            ascending=False,
+        )
+    )
+
+    st.dataframe(
+        summary,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    fig = go.Figure(
+        go.Bar(
+            x=summary["Department"],
+            y=summary["Employees"],
+            marker_color="#10B981",
+            hovertemplate=(
+                "%{x}: %{y} employees"
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    fig.update_xaxes(
+        showgrid=False
+    )
+
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor="#EEF2F7",
+    )
+
+    fig.update_layout(
+        title="Employees by Department"
+    )
+
+    chart_base(fig, 330)
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={
+            "displayModeBar": False
+        },
+    )
+
+
+# ============================================================
+# 18. LOCATION TRACKER
+# ============================================================
+
+def render_location_tracker(df_att):
+    st.markdown(
+        "### 📍 Attendance Location Tracker"
+    )
+
+    df = prepare_attendance(
+        df_att
+    )
+
+    if (
+        df.empty
+        or "Login Latitude"
+        not in df.columns
+    ):
+        st.info(
+            "No GPS attendance data available."
+        )
+        return
+
+    coords = df[
+        [
+            "Employee",
+            "Date",
+            "Login Latitude",
+            "Login Longitude",
+        ]
+    ].copy()
+
+    coords["lat"] = pd.to_numeric(
+        coords["Login Latitude"],
+        errors="coerce",
+    )
+
+    coords["lon"] = pd.to_numeric(
+        coords["Login Longitude"],
+        errors="coerce",
+    )
+
+    coords = coords.dropna(
+        subset=[
+            "lat",
+            "lon",
+        ]
+    )
+
+    if coords.empty:
+        st.info(
+            "No valid latitude/longitude "
+            "values found."
+        )
+        return
+
+    st.map(
+        coords[
+            [
+                "lat",
+                "lon",
+            ]
+        ],
+        zoom=5,
+    )
+
+    st.dataframe(
+        coords[
+            [
+                "Employee",
+                "Date",
+                "lat",
+                "lon",
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# ============================================================
+# 19. LEAVE MANAGEMENT
+# ============================================================
+
+def render_leave_management(
+    df_leave,
+):
+    st.markdown(
+        "### 🏖️ Leave Management"
+    )
+
+    role = st.session_state["role"]
+
+    current_employee = norm_name(
+        st.session_state["employee"]
+    )
+
+    if role == "employee":
+        st.markdown(
+            "#### Apply for Leave"
+        )
+
+        with st.form(
+            "leave_application_form"
+        ):
+            leave_date = st.date_input(
+                "Leave Date",
+                datetime.now(
+                    IST
+                ).date(),
+                key="leave_date",
+            )
+
+            reason = st.text_area(
+                "Reason",
+                key="leave_reason",
+            )
+
+            submit = (
+                st.form_submit_button(
+                    "Submit Leave Request",
+                    use_container_width=True,
+                )
+            )
+
+        if submit:
+            target_date = (
+                leave_date.strftime(
+                    "%d-%m-%y"
+                )
+            )
+
+            existing = (
+                df_leave[
+                    (
+                        df_leave["Employee"]
+                        == current_employee
+                    )
+                    & (
+                        df_leave["Date"]
+                        == target_date
+                    )
+                ]
+                if not df_leave.empty
+                else pd.DataFrame()
+            )
+
+            if not existing.empty:
+                st.warning(
+                    "⚠ Leave is already "
+                    "applied for this date."
+                )
+
+            elif not clean_text(reason):
+                st.warning(
+                    "Please enter a leave reason."
+                )
+
+            else:
+                _, leave_sheet = connect_sheet()
+
+                leave_sheet.append_row(
+                    [
+                        current_employee,
+                        target_date,
+                        reason.strip(),
+                        "Pending",
+                    ]
+                )
+
+                clear_data_cache()
 
                 st.success(
-                    "✅ Attendance Cleared Successfully"
+                    "✅ Leave request submitted."
                 )
 
                 st.rerun()
 
-            except Exception as e:
-                st.error(
-                    f"❌ Error clearing attendance: {e}"
+        st.markdown(
+            "#### My Leave Requests"
+        )
+
+        mine = df_leave[
+            df_leave["Employee"]
+            == current_employee
+        ]
+
+        st.dataframe(
+            mine,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    else:
+        st.markdown(
+            "#### Pending Leave Requests"
+        )
+
+        pending = df_leave[
+            df_leave["Status"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            == "PENDING"
+        ].copy()
+
+        if pending.empty:
+            st.success(
+                "No pending leave requests."
+            )
+            return
+
+        _, leave_sheet = connect_sheet()
+
+        all_values = (
+            leave_sheet.get_all_values()
+        )
+
+        for idx, row in pending.iterrows():
+            st.markdown(
+                '<div class="saas-card">',
+                unsafe_allow_html=True,
+            )
+
+            c1, c2, c3 = st.columns(
+                [3, 2, 2]
+            )
+
+            with c1:
+                st.write(
+                    f"**{row['Employee'].title()}**"
                 )
 
-    # ========================================================
-    # ✅ REMOVE DUPLICATE ENTRIES
-    # ========================================================
+                st.caption(
+                    clean_text(
+                        row["Reason"],
+                        "No reason provided",
+                    )
+                )
+
+            with c2:
+                st.write(
+                    f"Date: **{row['Date']}**"
+                )
+
+                st.caption(
+                    "Status: Pending"
+                )
+
+            with c3:
+                approve_key = (
+                    f"approve_leave_{idx}"
+                )
+
+                reject_key = (
+                    f"reject_leave_{idx}"
+                )
+
+                sheet_row = None
+
+                for rno, values in enumerate(
+                    all_values[1:],
+                    start=2,
+                ):
+                    values = values + [
+                        ""
+                    ] * max(
+                        0,
+                        4 - len(values),
+                    )
+
+                    if (
+                        norm_name(
+                            values[0]
+                        )
+                        == norm_name(
+                            row["Employee"]
+                        )
+                        and date_key(
+                            values[1]
+                        )
+                        == date_key(
+                            row["Date"]
+                        )
+                        and clean_text(
+                            values[2]
+                        )
+                        == clean_text(
+                            row["Reason"]
+                        )
+                        and clean_text(
+                            values[3]
+                        ).upper()
+                        == "PENDING"
+                    ):
+                        sheet_row = rno
+                        break
+
+                b1, b2 = st.columns(2)
+
+                with b1:
+                    if st.button(
+                        "Approve",
+                        key=approve_key,
+                        use_container_width=True,
+                    ):
+                        if sheet_row:
+                            leave_sheet.update_cell(
+                                sheet_row,
+                                4,
+                                "Approved",
+                            )
+
+                            # Preserve existing behavior:
+                            # approved leave is also reflected
+                            # in the AttendanceData sheet.
+                            attendance_sheet, _ = connect_sheet()
+
+                            clear_data_cache()
+
+                            fresh_att = (
+                                prepare_attendance(
+                                    load_attendance()
+                                )
+                            )
+
+                            leave_date = date_key(
+                                row["Date"]
+                            )
+
+                            leave_employee = (
+                                norm_name(
+                                    row["Employee"]
+                                )
+                            )
+
+                            existing_leave_att = (
+                                fresh_att[
+                                    (
+                                        fresh_att["Date"]
+                                        == leave_date
+                                    )
+                                    & (
+                                        fresh_att["Employee"]
+                                        == leave_employee
+                                    )
+                                ]
+                                if not fresh_att.empty
+                                else pd.DataFrame()
+                            )
+
+                            if existing_leave_att.empty:
+                                attendance_sheet.append_row(
+                                    [
+                                        leave_date,
+                                        leave_employee,
+                                        "",
+                                        "",
+                                        "",
+                                        "Leave",
+                                        "Leave",
+                                        "",
+                                        "",
+                                        "",
+                                        "",
+                                    ]
+                                )
+
+                            clear_data_cache()
+
+                            st.success(
+                                "Leave approved and reflected "
+                                "in attendance."
+                            )
+
+                            st.rerun()
+
+                        else:
+                            st.error(
+                                "Could not locate "
+                                "the leave row."
+                            )
+
+                with b2:
+                    if st.button(
+                        "Reject",
+                        key=reject_key,
+                        use_container_width=True,
+                    ):
+                        if sheet_row:
+                            leave_sheet.update_cell(
+                                sheet_row,
+                                4,
+                                "Rejected",
+                            )
+
+                            clear_data_cache()
+
+                            st.warning(
+                                "Leave rejected."
+                            )
+
+                            st.rerun()
+
+                        else:
+                            st.error(
+                                "Could not locate "
+                                "the leave row."
+                            )
+
+            st.markdown(
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+
+# ============================================================
+# 20. REPORTS
+# ============================================================
+
+def render_reports(
+    df_att,
+    df_leave,
+):
+    st.markdown(
+        "### 📑 Reports & Export"
+    )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.markdown(
+            """
+            <div class="saas-card">
+                <div class="section-title">
+                    Attendance Report
+                </div>
+
+                <div class="small-muted">
+                    Complete historical attendance,
+                    login/logout and working hours.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.download_button(
+            "⬇ Download Attendance CSV",
+            data=df_att.to_csv(
+                index=False
+            ).encode("utf-8"),
+            file_name="Attendance_Report.csv",
+            mime="text/csv",
+            key="download_attendance_report",
+            use_container_width=True,
+        )
+
+    with c2:
+        st.markdown(
+            """
+            <div class="saas-card">
+                <div class="section-title">
+                    Leave Report
+                </div>
+
+                <div class="small-muted">
+                    Leave applications
+                    and approval status.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.download_button(
+            "⬇ Download Leave CSV",
+            data=df_leave.to_csv(
+                index=False
+            ).encode("utf-8"),
+            file_name="Leave_Report.csv",
+            mime="text/csv",
+            key="download_leave_report",
+            use_container_width=True,
+        )
 
     st.divider()
 
-    if st.button(
-        "🧹 Remove Duplicate Entries",
-        key="remove_duplicates_btn"
-    ):
+    if df_att.empty:
+        return
 
-        try:
-
-            sheet, _ = connect_sheet()
-
-            df = load_attendance()
-
-            df.columns = df.columns.str.strip()
-
-            if df.empty:
-
-                st.warning(
-                    "⚠ No data found in attendance sheet"
-                )
-                st.stop()
-
-            df["Date"] = pd.to_datetime(
-                df["Date"],
-                dayfirst=True, format="mixed", errors="coerce"
-            ).dt.strftime("%d-%m-%y")
-
-            # Remove only truly identical rows
-            df_clean = df.drop_duplicates()
-
-            removed_count = len(df) - len(df_clean)
-
-            sheet.clear()
-
-            data_to_write = [
-                df_clean.columns.tolist()
-            ] + df_clean.values.tolist()
-
-            sheet.update(
-                "A1",
-                data_to_write
-            )
-
-            try:
-                st.cache_data.clear()
-            except Exception:
-                pass
-
-            st.success(
-                f"✅ Removed {removed_count} duplicate entries"
-            )
-
-            st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                f"❌ Error removing duplicates: {e}"
-            )
-# ============================================================
-# ✅ LEAVE MANAGEMENT
-# ============================================================
-st.subheader("📩 Leave Management")
-
-leave_df = load_leave()
-
-employee_clean = str(employee).strip().upper()
-
-# ============================================================
-# ✅ EMPLOYEE LEAVE
-# ============================================================
-if role == "employee":
-
-    colA, colB = st.columns(2)
-
-    with colA:
-
-        start_date = st.date_input(
-            "Leave From",
-            today,
-            min_value=today,
-            key="emp_leave_start_date"
-        )
-
-    with colB:
-
-        end_date = st.date_input(
-            "Leave To",
-            start_date,
-            min_value=start_date,
-            key="emp_leave_end_date"
-        )
-
-    reason = st.text_input("Leave Reason", key="emp_leave_reason_input")
-
-    if st.button("Submit Leave", key="submit_leave_request_btn"):
-
-        if end_date < start_date:
-
-            st.error("❌ Invalid Date Range")
-
-        else:
-
-            _, leave_sheet = connect_sheet()
-
-            dates = pd.date_range(
-                start=start_date,
-                end=end_date
-            )
-
-            added = False
-
-            for d in dates:
-
-                d_str = d.strftime("%d-%m-%y")
-
-                duplicate = leave_df[
-                    (leave_df["Employee"] == employee_clean) &
-                    (leave_df["Date"] == d_str)
-                ]
-
-                if duplicate.empty:
-
-                    leave_sheet.append_row([
-                        employee,
-                        d_str,
-                        reason,
-                        "Pending"
-                    ])
-
-                    added = True
-
-            st.cache_data.clear()
-
-            if added:
-                st.success("✅ Leave Submitted")
-                st.rerun()
-
-            else:
-                st.warning("⚠ Leave Already Applied")
-
-    st.subheader("My Leave Requests")
-
-    leave_df = load_leave()
-
-    st.dataframe(
-        leave_df[leave_df["Employee"] == employee_clean]
+    df = prepare_attendance(
+        df_att
     )
 
-# ============================================================
-# ✅ ADMIN LEAVE APPROVAL
-# ============================================================
-if role == "admin":
+    df["Month"] = pd.to_datetime(
+        df["Date"],
+        dayfirst=True,
+        format="mixed",
+        errors="coerce",
+    ).dt.strftime(
+        "%Y-%m"
+    )
 
-    st.subheader("📋 Pending Leave Requests")
+    months = sorted(
+        df["Month"]
+        .dropna()
+        .unique()
+        .tolist(),
+        reverse=True,
+    )
 
-    pending = leave_df[
-        leave_df["Status"] == "Pending"
-    ]
+    if months:
+        selected_month = st.selectbox(
+            "Report Month",
+            months,
+            key="report_month",
+        )
 
-    if pending.empty:
-
-        st.info("No Pending Requests")
-
-    else:
-
-        for i, row in pending.iterrows():
-
-            st.write(
-                f"{row['Employee']} | "
-                f"{row['Date']} | "
-                f"{row['Reason']}"
-            )
-
-            c1, c2 = st.columns(2)
-
-            with c1:
-
-                if st.button(f"Approve {i}", key=f"approve_leave_btn_{i}"):
-
-                    _, leave_sheet = connect_sheet()
-
-                    row_num = i + 2
-
-                    leave_sheet.update_cell(
-                        row_num,
-                        4,
-                        "Approved"
-                    )
-
-                    sheet, _ = connect_sheet()
-
-                    sheet.append_row([
-                        row["Date"],
-                        row["Employee"],
-                        "",
-                        "",
-                        "",
-                        "Leave",
-                        "Leave",
-                        "",
-                        "",
-                        "",
-                        ""
-                    ])
-
-                    st.cache_data.clear()
-
-                    st.success("✅ Leave Approved")
-
-                    st.rerun()
-
-            with c2:
-
-                if st.button(f"Reject {i}", key=f"reject_leave_btn_{i}"):
-
-                    _, leave_sheet = connect_sheet()
-
-                    row_num = i + 2
-
-                    leave_sheet.update_cell(
-                        row_num,
-                        4,
-                        "Rejected"
-                    )
-
-                    st.cache_data.clear()
-
-                    st.warning("❌ Leave Rejected")
-
-                    st.rerun()
-
-# ============================================================
-# ✅ ATTENDANCE RECORDS & DASHBOARD
-# ============================================================
-st.subheader("📋 Attendance Records")
-
-df = load_attendance()
-
-df.columns = df.columns.str.strip()
-
-# ✅ ADD THIS
-df["Month"] = pd.to_datetime(
-    df["Date"],
-    errors="coerce"
-).dt.strftime("%Y-%m")
-
-if not df.empty:
-
-    # ========================================================
-    # ADMIN FILTERS
-    # ========================================================
-    if role == "admin":
-
-        f1, f2 = st.columns(2)
-
-        with f1:
-
-            emp_filter = st.selectbox(
-                "Filter Employee",
-                ["All"] +
-                sorted(df["Employee"].dropna().unique()),
-                key="admin_filter_emp_select"
-            )
-
-        with f2:
-
-            date_filter = st.date_input(
-                "Filter Date",
-                None,
-                key="admin_filter_date_input"
-            )
-
-        if emp_filter != "All":
-
-            df = df[
-                df["Employee"] == emp_filter
-            ]
-
-        if date_filter:
-
-            df = df[
-                df["Date"] ==
-                date_filter.strftime("%d-%m-%y")
-            ]
-
-    # ========================================================
-    # EMPLOYEE FILTER
-    # ========================================================
-    if role == "employee":
-
-        employee_clean = str(employee).strip().upper()
-
-        df = df[
-            df["Employee"] == employee_clean
+        month_df = df[
+            df["Month"]
+            == selected_month
         ]
 
-    # ========================================================
-    # FORMAT TIME
-    # ========================================================
-    df["Login"] = pd.to_datetime(
-        df["Login"],
-        errors="coerce"
-    ).dt.strftime("%H:%M:%S")
-
-    df["Logout"] = pd.to_datetime(
-        df["Logout"],
-        errors="coerce"
-    ).dt.strftime("%H:%M:%S")
-
-# ✅ Fix column type issues (safe version)
-if "Working Hours" in df.columns:
-    df["Working Hours"] = df["Working Hours"].astype(str)
-
-else:
-    st.info("No attendance records found")
-
-# ========================================================
-# ✅ FILTERS
-# ========================================================
-
-col1_mflt, col2_mflt = st.columns(2)
-
-# ✅ Month filter
-with col1_mflt:
-    month_list = sorted(df["Month"].dropna().unique(), reverse=True)
-
-    if not month_list:
-        st.info("No months available")
-        st.stop()
-
-    selected_month = st.selectbox(
-        "📅 Select Month",
-        month_list,
-        key="month_filter_monthly"
-    )
-
-# ✅ Employee filter
-with col2_mflt:
-    employee_list = df["Employee"].dropna().astype(str).unique().tolist()
-    employee_list = sorted(employee_list)
-    employee_list = ["All"] + employee_list
-
-    selected_employee = st.selectbox(
-        "👤 Select Employee",
-        employee_list,
-        key="employee_filter_monthly_v2"
-    )
-
-# ========================================================
-# ✅ APPLY FILTERS
-# ========================================================
-
-monthly_df = df[
-    df["Month"] == selected_month
-]
-
-# ✅ Employee filter
-if selected_employee != "All":
-
-    monthly_df = monthly_df[
-        monthly_df["Employee"] == selected_employee
-    ]
-monthly_df = monthly_df.copy()
-
-# ✅ ✅ ADD YOUR FIXES HERE ✅
-monthly_df["Date"] = pd.to_datetime(monthly_df["Date"]).dt.strftime("%d-%m-%y")
-monthly_df["Logout"] = monthly_df["Logout"].replace("None", "Pending")
-
-st.divider()
-
-# ============================================================
-# ✅ DASHBOARD SUMMARY (KPI CARDS)
-# ============================================================
-
-st.markdown("### 📊 Summary")
-
-total_records = len(monthly_df)
-
-unique_employees = (
-    monthly_df["Employee"]
-    .nunique()
-)
-
-full_days = len(
-    monthly_df[
-        monthly_df["Status"] == "Full Day"
-    ]
-)
-
-half_days = len(
-    monthly_df[
-        monthly_df["Status"] == "Half Day"
-    ]
-)
-
-short_days = len(
-    monthly_df[
-        monthly_df["Status"] == "Short Day"
-    ]
-)
-
-col1_kpi, col2_kpi, col3_kpi, col4_kpi, col5_kpi = st.columns(5)
-
-with col1_kpi:
-    st.metric("📋 Total Records", total_records)
-
-with col2_kpi:
-    st.metric("👥 Employees", unique_employees)
-
-with col3_kpi:
-    st.metric("✅ Full Days", full_days)
-
-with col4_kpi:
-    st.metric("⏱ Half Days", half_days)
-
-with col5_kpi:
-    st.metric("⚠️ Short Days", short_days)
-
-st.divider()
-
-# ============================================================
-# ✅ TABLE + DOWNLOAD (FIXED CALENDAR & DATE PARSING)
-# ============================================================
-
-if not monthly_df.empty:
-
-    st.markdown("### 📅 Attendance Details")
-
-    # ✅ Clean and standardize dates across the dataset (Fixes DD-MM vs MM-DD swap)
-    monthly_df_clean = monthly_df.copy()
-    
-    monthly_df_clean["Date_Parsed"] = pd.to_datetime(
-        monthly_df_clean["Date"], 
-        dayfirst=True, 
-        format="mixed", 
-        errors="coerce"
-    )
-
-    # Clean out invalid NaT dates and format cleanly as YYYY-MM-DD
-    monthly_df_clean = monthly_df_clean.dropna(subset=["Date_Parsed"])
-    monthly_df_clean["Date"] = monthly_df_clean["Date_Parsed"].dt.strftime("%d-%m-%y")
-
-    # Toggle between All Dates in Month or Specific Date
-    col_cal1, col_cal2 = st.columns([1, 2])
-
-    with col_cal1:
-        filter_mode = st.radio(
-            "Filter View",
-            ["All Dates in Month", "Specific Date"],
-            horizontal=True,
-            key="details_date_filter_mode"
+        st.dataframe(
+            month_df,
+            use_container_width=True,
+            hide_index=True,
         )
 
-    with col_cal2:
-        if filter_mode == "Specific Date":
-            # ✅ REMOVED min_value and max_value constraints so ALL past/previous dates are selectable
-            selected_calendar_date = st.date_input(
-                "📅 Select Date from Calendar",
-                value=date.today(),
-                key="attendance_details_calendar"
+
+# ============================================================
+# 21. ADMIN CONTROL PANEL
+# ============================================================
+
+def render_admin_panel(
+    df_att,
+    df_emp,
+):
+    st.markdown(
+        "### ⚙️ Admin Control Panel"
+    )
+
+    st.markdown(
+        """
+        <div class="saas-card">
+            <div class="section-title">
+                Google Sheets Connection
+            </div>
+
+            <div class="small-muted">
+                Attendance data is stored in
+                <b>AttendanceData</b> and leave data in
+                the <b>Leave</b> worksheet.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    try:
+        connect_sheet()
+
+        st.success(
+            "🟢 Google Sheets API: Connected & Live"
+        )
+
+    except Exception:
+        st.warning(
+            "🟡 Google Sheets API: Connection unavailable"
+        )
+
+    st.divider()
+
+    with st.expander(
+        "🛠️ Manual Attendance Data Editor"
+    ):
+        edited = st.data_editor(
+            df_att,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="admin_attendance_editor",
+        )
+
+        if st.button(
+            "💾 Save Attendance Changes",
+            key="save_admin_attendance",
+        ):
+            try:
+                save_attendance_dataframe(
+                    edited
+                )
+
+                st.success(
+                    "✅ Attendance database updated."
+                )
+
+                st.rerun()
+
+            except Exception as exc:
+                st.error(
+                    f"❌ Save failed: {exc}"
+                )
+
+    with st.expander(
+        "🧹 Attendance Maintenance"
+    ):
+        confirm = st.checkbox(
+            "I understand these actions modify attendance records.",
+            key="confirm_admin_maintenance",
+        )
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            if st.button(
+                "Remove Duplicate Entries",
+                key="remove_duplicates",
+                disabled=not confirm,
+                use_container_width=True,
+            ):
+                if df_att.empty:
+                    st.info(
+                        "No attendance records found."
+                    )
+                else:
+                    clean_df = (
+                        df_att
+                        .drop_duplicates()
+                        .copy()
+                    )
+
+                    removed = (
+                        len(df_att)
+                        - len(clean_df)
+                    )
+
+                    save_attendance_dataframe(
+                        clean_df
+                    )
+
+                    st.success(
+                        f"✅ Removed {removed} "
+                        "duplicate records."
+                    )
+
+                    st.rerun()
+
+        with c2:
+            if st.button(
+                "Clear All Attendance",
+                key="clear_all_attendance",
+                disabled=not confirm,
+                use_container_width=True,
+            ):
+                try:
+                    sheet, _ = connect_sheet()
+
+                    sheet.clear()
+
+                    sheet.append_row(
+                        ATTENDANCE_HEADERS
+                    )
+
+                    clear_data_cache()
+
+                    st.success(
+                        "✅ Attendance sheet cleared."
+                    )
+
+                    st.rerun()
+
+                except Exception as exc:
+                    st.error(
+                        f"❌ Clear failed: {exc}"
+                    )
+
+    st.divider()
+
+    st.markdown(
+        "#### Employee Master Preview"
+    )
+
+    st.dataframe(
+        df_emp,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+# ============================================================
+# 22. APPLICATION ENTRY POINT
+# ============================================================
+
+def main():
+    df_emp = load_employee_master()
+
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+
+    if "role" not in st.session_state:
+        st.session_state["role"] = ""
+
+    if "employee" not in st.session_state:
+        st.session_state["employee"] = ""
+
+    if "page" not in st.session_state:
+        st.session_state["page"] = "📊 Dashboard"
+
+    st.session_state["users"] = build_users(
+        df_emp
+    )
+
+    if not st.session_state["logged_in"]:
+        render_login_page()
+        return
+
+    df_att = load_attendance()
+    df_leave = load_leave()
+
+    render_sidebar()
+
+    render_brand_header(
+        st.session_state["employee"],
+        st.session_state["role"],
+    )
+
+    page = st.session_state["page"]
+
+    if page == "📊 Dashboard":
+        render_dashboard(
+            df_emp,
+            df_att,
+            df_leave,
+        )
+
+    elif page == "⏱️ Clock In / Out":
+        render_clock_in_out(
+            df_att
+        )
+
+    elif page == "📋 Attendance Records":
+        render_attendance_records(
+            df_att
+        )
+
+    elif page == "👤 Employee Profile":
+        render_employee_profile(
+            df_emp,
+            df_att,
+        )
+
+    elif page == "🏖️ Leave Management":
+        render_leave_management(
+            df_leave
+        )
+
+    elif page == "📈 Analytics":
+        render_analytics(
+            df_att
+        )
+
+    elif page == "🏢 Department Analysis":
+        if st.session_state["role"] == "admin":
+            render_department_analysis(
+                df_emp,
+                df_att,
             )
-            date_str_filter = selected_calendar_date.strftime("%d-%m-%y")
         else:
-            date_str_filter = None
+            st.error(
+                "🔒 Admin access required."
+            )
 
-    # ✅ Filter data for table view
-    if date_str_filter:
-        display_df = monthly_df_clean[monthly_df_clean["Date"] == date_str_filter].copy()
-    else:
-        display_df = monthly_df_clean.copy()
+    elif page == "📍 Location Tracker":
+        if st.session_state["role"] == "admin":
+            render_location_tracker(
+                df_att
+            )
+        else:
+            st.error(
+                "🔒 Admin access required."
+            )
 
-    # Drop internal helper column
-    if "Date_Parsed" in display_df.columns:
-        display_df = display_df.drop(columns=["Date_Parsed"])
-
-    # ✅ Render Table
-    if not display_df.empty:
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-        st.divider()
-
-        # ✅ Download Report
-        file_suffix = date_str_filter if date_str_filter else selected_month
-        st.download_button(
-            label="⬇ Download Selected Report",
-            data=display_df.to_csv(index=False).encode("utf-8"),
-            file_name=f"attendance_report_{file_suffix}.csv",
-            mime="text/csv",
-            key="download_monthly_report_btn"
+    elif page == "📑 Reports & Export":
+        render_reports(
+            df_att,
+            df_leave,
         )
-    else:
-        if date_str_filter:
-            st.info(f"⚠ No attendance records found for {date_str_filter}")
+
+    elif page == "⚙️ Admin Control Panel":
+        if st.session_state["role"] == "admin":
+            render_admin_panel(
+                df_att,
+                df_emp,
+            )
         else:
-            st.info("⚠ No attendance records found for selected month.")
+            st.error(
+                "🔒 Admin access required."
+            )
 
-else:
-    st.info("⚠ No data available for selected month")
 
-# ============================================================
-# ✅ FULL DOWNLOAD (ALL DATA)
-# ============================================================
-if role == "admin":
-    
-    st.markdown("### 📥 Download Full Data")
-
-st.download_button(
-    label="📥 Download Full Attendance",
-    data=df.to_csv(index=False).encode("utf-8"),
-    file_name="attendance_full.csv",
-    mime="text/csv",
-    key="download_full_attendance"
-)
+if __name__ == "__main__":
+    main()
