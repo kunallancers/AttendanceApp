@@ -25,6 +25,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytz
 import streamlit as st
+import textwrap
 from oauth2client.service_account import ServiceAccountCredentials
 from streamlit_geolocation import streamlit_geolocation
 
@@ -597,62 +598,87 @@ def capture_location():
 
 
 # ============================================================
-# 8. HEADER / LOGIN
+# EXECUTIVE HEADER
 # ============================================================
 
-def get_logo_base64():
-    for path in ["Logo white.png", "logo.png"]:
-        if os.path.exists(path):
-            try:
-                with open(path, "rb") as img:
-                    return base64.b64encode(img.read()).decode("utf-8")
-            except Exception:
-                pass
-
-    return ""
-
-
 def render_brand_header(current_user, user_role):
-    now = datetime.now(IST)
-    logo = get_logo_base64()
+    now_ist = get_ist()
+    current_hour = now_ist.hour
 
-    logo_html = (
-        f'<img src="data:image/png;base64,{logo}" '
-        f'style="max-height:42px;width:auto;margin-right:14px;">'
-        if logo
-        else '<span style="font-size:2rem;margin-right:12px;">🛡️</span>'
-    )
+    if current_hour < 12:
+        greeting = "Good Morning"
+    elif current_hour < 17:
+        greeting = "Good Afternoon"
+    else:
+        greeting = "Good Evening"
+
+    formatted_date = now_ist.strftime("%A, %d %B %Y")
+    user_display_name = str(current_user).strip().title()
+    user_role_display = str(user_role).strip().title()
+
+    header_html = textwrap.dedent(f"""
+<div style="
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);
+    padding:16px 24px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.08);
+    box-shadow:0 4px 20px rgba(0,0,0,0.15);
+    margin-bottom:20px;
+">
+    <div>
+        <div style="
+            color:#FFFFFF;
+            font-size:1.25rem;
+            font-weight:700;
+        ">
+            Lancers Risk Consulting
+        </div>
+
+        <div style="
+            color:#94A3B8;
+            font-size:0.82rem;
+            margin-top:2px;
+        ">
+            Enterprise Attendance & Workforce Analytics
+        </div>
+    </div>
+
+    <div style="text-align:right;">
+        <div style="
+            color:#FFFFFF;
+            font-weight:700;
+            font-size:0.95rem;
+        ">
+            {greeting}, {user_display_name} 👋
+        </div>
+
+        <div style="
+            color:#94A3B8;
+            font-size:0.78rem;
+            margin-top:4px;
+        ">
+            {formatted_date} · Role:
+
+            <span style="
+                color:#7DD3FC;
+                font-weight:600;
+                background:rgba(56,189,248,0.15);
+                padding:3px 8px;
+                border-radius:6px;
+            ">
+                {user_role_display}
+            </span>
+        </div>
+    </div>
+</div>
+""")
 
     st.markdown(
-        f"""
-        <div class="header-card">
-            <div style="display:flex;justify-content:space-between;
-                        align-items:center;gap:20px;">
-                <div style="display:flex;align-items:center;">
-                    {logo_html}
-                    <div>
-                        <div class="header-title">Lancers Risk Consulting</div>
-                        <div class="header-subtitle">
-                            Enterprise HRMS & Workforce Analytics
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="header-user">
-                        Good Morning, {html_text(current_user)} 👋
-                    </div>
-                    <div class="header-date">
-                        {now.strftime("%A, %d %B %Y")} · Role:
-                        <span style="color:#7DD3FC;">
-                            {html_text(user_role.title())}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+        header_html,
+        unsafe_allow_html=True
     )
 
 
