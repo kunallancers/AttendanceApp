@@ -11,8 +11,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_geolocation import streamlit_geolocation
 
+import base64
+import streamlit as st
+
 # ============================================================
-# ✅ PAGE CONFIG (MUST BE FIRST STREAMLIT COMMAND)
+# ✅ PAGE CONFIG (MUST BE CALLED ONLY ONCE AT THE VERY TOP)
 # ============================================================
 
 st.set_page_config(
@@ -21,23 +24,36 @@ st.set_page_config(
 )
 
 # ============================================================
-# 1. PAGE CONFIG & LOGO HEADER
+# ✅ UNIFIED CORPORATE DASHBOARD STYLING (CSS)
 # ============================================================
-st.set_page_config(page_title="Attendance Management System", layout="wide")
 
-# ... (Your logo header code lives here) ...
-
-# ============================================================
-# 2. DASHBOARD LIGHT CUSTOM CSS (PASTE HERE)
-# ============================================================
 st.markdown("""
 <style>
-    .main .block-container {
-        max-width: 1350px;
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
+    /* 1. Global Font & Main Container */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2.5rem;
+        max-width: 1350px;
+    }
+
+    /* 2. Elevated Header Banner */
+    .brand-banner {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 3. Dashboard & KPI Metric Cards */
     .dashboard-card {
         background-color: #ffffff;
         border-radius: 18px;
@@ -59,6 +75,26 @@ st.markdown("""
     .kpi-sub-green { font-size: 0.78rem; color: #10b981; font-weight: 600; }
     .kpi-sub-pink { font-size: 0.78rem; color: #ec4899; font-weight: 600; }
 
+    /* 4. Streamlit Metric Component Overrides */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-3px);
+        border-color: rgba(99, 102, 241, 0.4);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+    div[data-testid="stMetricValue"] {
+        font-weight: 700;
+        font-size: 1.9rem;
+    }
+
+    /* 5. Employee List Status Indicators */
     .emp-item {
         display: flex;
         align-items: center;
@@ -70,60 +106,8 @@ st.markdown("""
     }
     .dot-green { height: 10px; width: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; }
     .dot-pink { height: 10px; width: 10px; background-color: #ec4899; border-radius: 50%; display: inline-block; }
-</style>
-""", unsafe_allow_html=True)
-# ============================================================
-# ✅ MODERN CUSTOM UI & BRAND THEME STYLING
-# ============================================================
 
-st.markdown("""
-<style>
-    /* 1. Global Font & Main Container Styling */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    
-    .main .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 3rem;
-        max-width: 1250px;
-    }
-
-    /* 2. Elevated Header Banner Styling */
-    .brand-banner {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 20px;
-        text-align: center;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-    }
-
-    /* 3. Modern Metric Cards */
-    div[data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        padding: 16px 20px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-        transition: all 0.3s ease;
-    }
-    
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-3px);
-        border-color: rgba(99, 102, 241, 0.4);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-    }
-
-    div[data-testid="stMetricValue"] {
-        font-weight: 700;
-        font-size: 1.9rem;
-    }
-
-    /* 4. Custom Button Animations */
+    /* 6. Button Animations & Form Elements */
     .stButton > button {
         border-radius: 10px;
         font-weight: 600;
@@ -132,25 +116,18 @@ st.markdown("""
         border: 1px solid rgba(255, 255, 255, 0.1);
         padding: 0.5rem 1.25rem;
     }
-
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
     }
-
-    /* 5. Clean Input Boxes & Selectboxes */
     .stTextInput > div > div > input, .stSelectbox > div > div {
         border-radius: 10px;
     }
-
-    /* 6. Dataframe Styling */
     [data-testid="stDataFrame"] {
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 12px;
         overflow: hidden;
     }
-
-    /* 7. Section Dividers */
     hr {
         margin: 2rem 0;
         border-color: rgba(255, 255, 255, 0.08);
@@ -161,8 +138,6 @@ st.markdown("""
 # ============================================================
 # ✅ APP HEADER (THEME-SAFE CENTERED LOGO & BRAND)
 # ============================================================
-
-import base64
 
 def get_image_base64(image_path):
     try:
