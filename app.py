@@ -4,6 +4,8 @@ from datetime import date, datetime, timezone
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import pytz
 import streamlit as st
 import streamlit.components.v1 as components
@@ -18,6 +20,58 @@ st.set_page_config(
     layout="wide"
 )
 
+# ============================================================
+# 1. PAGE CONFIG & LOGO HEADER
+# ============================================================
+st.set_page_config(page_title="Attendance Management System", layout="wide")
+
+# ... (Your logo header code lives here) ...
+
+# ============================================================
+# 2. DASHBOARD LIGHT CUSTOM CSS (PASTE HERE)
+# ============================================================
+st.markdown("""
+<style>
+    .main .block-container {
+        max-width: 1350px;
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+    
+    .dashboard-card {
+        background-color: #ffffff;
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 20px;
+    }
+
+    .kpi-card {
+        background-color: #ffffff;
+        border-radius: 16px;
+        padding: 16px 20px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+    .kpi-title { font-size: 0.85rem; color: #6b7280; font-weight: 600; }
+    .kpi-val { font-size: 1.6rem; font-weight: 700; color: #111827; margin: 4px 0; }
+    .kpi-sub-green { font-size: 0.78rem; color: #10b981; font-weight: 600; }
+    .kpi-sub-pink { font-size: 0.78rem; color: #ec4899; font-weight: 600; }
+
+    .emp-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: #374151;
+    }
+    .dot-green { height: 10px; width: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; }
+    .dot-pink { height: 10px; width: 10px; background-color: #ec4899; border-radius: 50%; display: inline-block; }
+</style>
+""", unsafe_allow_html=True)
 # ============================================================
 # ✅ MODERN CUSTOM UI & BRAND THEME STYLING
 # ============================================================
