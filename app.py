@@ -3575,7 +3575,7 @@ if "employee" not in st.session_state:
 
     if not st.session_state["logged_in"]:
         render_login_page()
-        return
+        st.stop()
 
     df_att = load_attendance()
     df_leave = load_leave()
