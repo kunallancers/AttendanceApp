@@ -17,14 +17,189 @@ st.set_page_config(
     page_title="Attendance Management System",
     layout="wide"
 )
+
+# ============================================================
+# ✅ MODERN CUSTOM UI & BRAND THEME STYLING
+# ============================================================
+
+st.markdown("""
+<style>
+    /* 1. Global Font & Main Container Styling */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+        max-width: 1250px;
+    }
+
+    /* 2. Elevated Header Banner Styling */
+    .brand-banner {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 3. Modern Metric Cards */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-3px);
+        border-color: rgba(99, 102, 241, 0.4);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    div[data-testid="stMetricValue"] {
+        font-weight: 700;
+        font-size: 1.9rem;
+    }
+
+    /* 4. Custom Button Animations */
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.5rem 1.25rem;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 5. Clean Input Boxes & Selectboxes */
+    .stTextInput > div > div > input, .stSelectbox > div > div {
+        border-radius: 10px;
+    }
+
+    /* 6. Dataframe Styling */
+    [data-testid="stDataFrame"] {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* 7. Section Dividers */
+    hr {
+        margin: 2rem 0;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 import base64
+
+# ============================================================
+# ✅ MODERN CUSTOM UI & BRAND THEME STYLING
+# ============================================================
+
+st.markdown("""
+<style>
+    /* 1. Global Font & Main Container Styling */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+        max-width: 1250px;
+    }
+
+    /* 2. Elevated Header Banner Styling */
+    .brand-banner {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 3. Modern Metric Cards */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="stMetric"]:hover {
+        transform: translateY(-3px);
+        border-color: rgba(99, 102, 241, 0.4);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    div[data-testid="stMetricValue"] {
+        font-weight: 700;
+        font-size: 1.9rem;
+    }
+
+    /* 4. Custom Button Animations */
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 0.5rem 1.25rem;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 5. Clean Input Boxes & Selectboxes */
+    .stTextInput > div > div > input, .stSelectbox > div > div {
+        border-radius: 10px;
+    }
+
+    /* 6. Dataframe Styling */
+    [data-testid="stDataFrame"] {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* 7. Section Dividers */
+    hr {
+        margin: 2rem 0;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ============================================================
 # ✅ APP HEADER (THEME-SAFE CENTERED LOGO)
 # ============================================================
 
+import base64
+
+# Function to encode logo image safely
 def get_image_base64(image_path):
-    """Converts local logo image to base64 string for CSS HTML rendering."""
     try:
         with open(image_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode("utf-8")
@@ -34,26 +209,19 @@ def get_image_base64(image_path):
 logo_b64 = get_image_base64("Logo white.png")
 
 if logo_b64:
-    # Renders logo inside a dark rounded card container so it stays visible on Light & Dark themes
     st.markdown(
         f"""
-        <div style="text-align: center; margin-bottom: 10px;">
-            <div style="
-                display: inline-block;
-                background-color: #1a1e29;
-                padding: 12px 28px;
-                border-radius: 12px;
-                box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
-            ">
-                <img src="data:image/png;base64,{logo_b64}" style="max-width: 320px; height: auto;">
-            </div>
+        <div class="brand-banner">
+            <img src="data:image/png;base64,{logo_b64}" style="max-width: 320px; height: auto; margin-bottom: 8px;">
+            <h2 style="margin: 0; font-size: 1.6rem; color: #ffffff; font-weight: 700;">Lancers Risk Consulting</h2>
+            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.95rem;">Attendance Management System</p>
         </div>
         """,
         unsafe_allow_html=True
     )
 else:
-    # Fallback header if image file is not found
-    st.markdown("<h2 style='text-align: center;'>🛡️ LANCERS</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>🛡️ Lancers Risk Consulting</h2>", unsafe_allow_html=True)
+    st.markdown("<h5 style='text-align: center; color: #888;'>Attendance Management System</h5>", unsafe_allow_html=True)
 
 # Centered Brand Title & Subtitle
 st.markdown("<h2 style='text-align: center; margin-top: 5px;'>Lancers Risk Consulting</h2>", unsafe_allow_html=True)
