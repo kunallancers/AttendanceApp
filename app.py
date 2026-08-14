@@ -712,7 +712,7 @@ def render_login_page():
         st.error("❌ Invalid username or password.")
 
 # ============================================================
-# ✅ EXECUTIVE HEADER BANNER (WRAPPED IN PYTHON)
+# ✅ EXECUTIVE HEADER BANNER (FIXED)
 # ============================================================
 
 st.markdown("""
