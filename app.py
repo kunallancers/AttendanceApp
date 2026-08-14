@@ -879,38 +879,78 @@ def day_frame(df_att, target_date):
     target = target_date.strftime("%d-%m-%y")
     return df_att[df_att["Date"] == target].copy()
 
+def parse_duration_to_hours(val):
+    """
+    Safely converts strings ('08:30:00', '08:30', '4.5'), timedeltas,
+    or numeric values into float hours. Returns 0.0 on invalid inputs.
+    """
+    if pd.isna(val) or val in ["", "-", "None", "nan", "NaN", None]:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, timedelta):
+        return val.total_seconds() / 3600.0
+    
+    val_str = str(val).strip()
+    # Handle "HH:MM:SS" or "HH:MM" format
+    if ":" in val_str:
+        parts = val_str.split(":")
+        try:
+            hrs = float(parts[0])
+            mins = float(parts[1]) if len(parts) > 1 else 0.0
+            secs = float(parts[2]) if len(parts) > 2 else 0.0
+            return hrs + (mins / 60.0) + (secs / 3600.0)
+        except (ValueError, IndexError):
+            return 0.0
+    
+    # Handle direct numeric strings like "8.5"
+    try:
+        return float(val_str)
+    except ValueError:
+        return 0.0
 
-def weekly_metrics(df_att, selected_date):
-    start = selected_date - timedelta(
-        days=selected_date.weekday()
+def weekly_metrics(df, selected_date):
+    """
+    Calculates 7-day Monday-to-Sunday metrics safely without crashing on strings.
+    """
+    # 1. Normalize dates in dataframe
+    if df is None or df.empty:
+        return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], [0.0] * 7, [0] * 7
+
+    df_copy = df.copy()
+    df_copy["Date_dt"] = pd.to_datetime(
+        df_copy["Date"], dayfirst=True, format="mixed", errors="coerce"
     )
 
-    days = [
-        start + timedelta(days=i)
-        for i in range(7)
-    ]
+    # 2. Convert 'Working Hours' strings safely to numeric float hours
+    if "Working Hours" in df_copy.columns:
+        df_copy["Hours_Numeric"] = df_copy["Working Hours"].apply(parse_duration_to_hours)
+    else:
+        df_copy["Hours_Numeric"] = 0.0
 
-    hours = []
-    attendance = []
+    # 3. Calculate 7 days (Monday to Sunday) for the selected week
+    start_of_week = selected_date - timedelta(days=selected_date.weekday())
+    week_days_dt = [start_of_week + timedelta(days=i) for i in range(7)]
+    week_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-    for day in days:
-        ddf = day_frame(df_att, day)
+    actual_hours = []
+    attendance_count = []
 
-        hours.append(
-            round(
-                ddf["Working Hours"]
-                .map(working_hours_to_decimal)
-                .sum(),
-                2,
-            )
-        )
+    for day_dt in week_days_dt:
+        d_str = day_dt.strftime("%d-%m-%y")
+        day_slice = df_copy[df_copy["Date_dt"].dt.strftime("%d-%m-%y") == d_str]
 
-        attendance.append(
-            ddf["Employee"].nunique()
-        )
+        if not day_slice.empty:
+            day_total_hrs = round(float(day_slice["Hours_Numeric"].sum()), 2)
+            day_att_count = int(len(day_slice))
+        else:
+            day_total_hrs = 0.0
+            day_att_count = 0
 
-    return days, hours, attendance
+        actual_hours.append(day_total_hrs)
+        attendance_count.append(day_att_count)
 
+    return week_labels, actual_hours, attendance_count
 
 # ============================================================
 # 11. CHART / KPI HELPERS
