@@ -3501,47 +3501,153 @@ def main():
 
     render_sidebar()
 
-    render_brand_header(
-        st.session_state["employee"],
-        st.session_state["role"],
-    )
+    # 👈 PUT THE NEW DYNAMIC HEADER HERE
 
+    # THEN CONTINUE
     page = st.session_state["page"]
 
     if page == "📊 Dashboard":
-        render_dashboard(
-            df_emp,
-            df_att,
-            df_leave,
+        render_dashboard(...)
+
+        render_brand_header(
+            st.session_state["employee"],
+            st.session_state["role"],
         )
 
-    elif page == "⏱️ Clock In / Out":
+# ============================================================
+# PASTE DYNAMIC HEADER HERE
+# ============================================================
+
+now_ist = get_ist()
+current_hour = now_ist.hour
+
+if current_hour < 12:
+    greeting = "Good Morning"
+elif current_hour < 17:
+    greeting = "Good Afternoon"
+else:
+    greeting = "Good Evening"
+
+formatted_date = now_ist.strftime("%A, %d %B %Y")
+
+user_display_name = str(
+    st.session_state.get("employee", "ADMIN")
+).strip().title()
+
+user_role_display = str(
+    st.session_state.get("role", "Admin")
+).strip().title()
+
+st.markdown(
+    f"""
+    <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        background:linear-gradient(
+            135deg,
+            #0F172A 0%,
+            #1E293B 100%
+        );
+        padding:16px 24px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,0.08);
+        box-shadow:0 4px 20px rgba(0,0,0,0.15);
+        margin-bottom:20px;
+    ">
+
+        <div>
+            <h3 style="
+                margin:0;
+                color:#FFFFFF;
+                font-size:1.25rem;
+                font-weight:700;
+            ">
+                Lancers Risk Consulting
+            </h3>
+
+            <p style="
+                margin:2px 0 0 0;
+                color:#94A3B8;
+                font-size:0.82rem;
+            ">
+                Enterprise Attendance & Workforce Analytics
+            </p>
+        </div>
+
+        <div style="text-align:right;">
+
+            <div style="
+                color:#FFFFFF;
+                font-weight:700;
+                font-size:0.95rem;
+            ">
+                {greeting}, {user_display_name} 👋
+            </div>
+
+            <div style="
+                color:#94A3B8;
+                font-size:0.78rem;
+                margin-top:2px;
+            ">
+                {formatted_date} · Role:
+                <span style="
+                    color:#7DD3FC;
+                    font-weight:600;
+                    background:rgba(56,189,248,0.15);
+                    padding:2px 8px;
+                    border-radius:6px;
+                ">
+                    {user_role_display}
+                </span>
+            </div>
+
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# EXISTING PAGE LOGIC CONTINUES
+# ============================================================
+
+page = st.session_state["page"]
+if page == "📊 Dashboard":
+    render_dashboard(
+        df_emp,
+        df_att,
+        df_leave,
+    )
+
+elif page == "⏱️ Clock In / Out":
         render_clock_in_out(
             df_att
         )
 
-    elif page == "📋 Attendance Records":
+elif page == "📋 Attendance Records":
         render_attendance_records(
             df_att
         )
 
-    elif page == "👤 Employee Profile":
+elif page == "👤 Employee Profile":
         render_employee_profile(
             df_emp,
             df_att,
         )
 
-    elif page == "🏖️ Leave Management":
+elif page == "🏖️ Leave Management":
         render_leave_management(
             df_leave
         )
 
-    elif page == "📈 Analytics":
+elif page == "📈 Analytics":
         render_analytics(
             df_att
         )
 
-    elif page == "🏢 Department Analysis":
+elif page == "🏢 Department Analysis":
         if st.session_state["role"] == "admin":
             render_department_analysis(
                 df_emp,
@@ -3552,7 +3658,7 @@ def main():
                 "🔒 Admin access required."
             )
 
-    elif page == "📍 Location Tracker":
+elif page == "📍 Location Tracker":
         if st.session_state["role"] == "admin":
             render_location_tracker(
                 df_att
@@ -3562,13 +3668,13 @@ def main():
                 "🔒 Admin access required."
             )
 
-    elif page == "📑 Reports & Export":
+elif page == "📑 Reports & Export":
         render_reports(
             df_att,
             df_leave,
         )
 
-    elif page == "⚙️ Admin Control Panel":
+elif page == "⚙️ Admin Control Panel":
         if st.session_state["role"] == "admin":
             render_admin_panel(
                 df_att,
