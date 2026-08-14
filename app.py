@@ -3554,17 +3554,20 @@ def render_admin_panel(
 def main():
     df_emp = load_employee_master()
 
-    if "logged_in" not in st.session_state:
-        st.session_state["logged_in"] = False
+# ============================================================
+# ✅ SESSION STATE INITIALIZATION
+# ============================================================
+if "page" not in st.session_state:
+    st.session_state["page"] = "Dashboard"  # set to your default starting page
 
-    if "role" not in st.session_state:
-        st.session_state["role"] = ""
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
 
-    if "employee" not in st.session_state:
-        st.session_state["employee"] = ""
+if "role" not in st.session_state:
+    st.session_state["role"] = ""
 
-    if "page" not in st.session_state:
-        st.session_state["page"] = "📊 Dashboard"
+if "employee" not in st.session_state:
+    st.session_state["employee"] = ""
 
     st.session_state["users"] = build_users(
         df_emp
@@ -3582,7 +3585,8 @@ def main():
     # 👈 PUT THE NEW DYNAMIC HEADER HERE
 
     # THEN CONTINUE
-    page = st.session_state["page"]
+    # ✅ Safely returns "Dashboard" (or your default page name) if not set
+    page = st.session_state.get("page", "Dashboard")
 
     if page == "📊 Dashboard":
         render_dashboard(...)
