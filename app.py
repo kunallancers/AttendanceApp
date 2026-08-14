@@ -16,7 +16,6 @@ Preserved core functionality:
 """
 
 import os
-import base64
 import html
 from datetime import date, datetime, time, timedelta
 
@@ -424,6 +423,10 @@ def connect_sheet():
         workbook = client.open(workbook_name)
         sheet = workbook.sheet1
 
+        # Initialize the attendance worksheet when it is empty.
+        if not sheet.row_values(1):
+            sheet.append_row(ATTENDANCE_HEADERS)
+
         try:
             leave_sheet = workbook.worksheet("Leave")
         except Exception:
@@ -470,7 +473,7 @@ def load_employee_master():
 def build_users(df_emp):
     users = {
         "admin": {
-            "password": "admin123",
+            "password": clean_text(st.secrets.get("ADMIN_PASSWORD", "admin123")),
             "role": "admin",
             "employee": "ADMIN",
         }
@@ -683,14 +686,7 @@ def render_brand_header(current_user, user_role):
 
 
 def render_login_page():
-    logo = get_logo_base64()
-
-    logo_html = (
-        f'<img src="data:image/png;base64,{logo}" '
-        f'style="max-height:58px;width:auto;">'
-        if logo
-        else '<div style="font-size:3rem;">🛡️</div>'
-    )
+    logo_html = '<div style="font-size:3rem;">🛡️</div>'
 
     st.markdown(
         f"""
@@ -737,69 +733,9 @@ def render_login_page():
 
         st.error("❌ Invalid username or password.")
 
-# ============================================================
-# ✅ EXECUTIVE HEADER BANNER (FIXED)
-# ============================================================
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
-st.markdown("""
-<div style="
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-    padding: 16px 24px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    margin-bottom: 20px;
-">
-    <!-- Left Side: Brand Title & Subtitle -->
-    <div>
-        <h3 style="
-            margin: 0;
-            color: #FFFFFF;
-            font-size: 1.25rem;
-            font-weight: 700;
-        ">
-            Lancers Risk Consulting
-        </h3>
-        <p style="
-            margin: 2px 0 0 0;
-            color: #94A3B8;
-            font-size: 0.82rem;
-        ">
-            Enterprise Attendance & Workforce Analytics
-        </p>
-    </div>
-
-    <!-- Right Side: User Greeting, Date & Role Badge -->
-    <div style="text-align: right;">
-        <div style="
-            color: #FFFFFF;
-            font-weight: 700;
-            font-size: 0.95rem;
-        ">
-            Good Afternoon, Admin 👋
-        </div>
-        <div style="
-            color: #94A3B8;
-            font-size: 0.78rem;
-            margin-top: 2px;
-        ">
-            Friday, 14 August 2026 · Role:
-            <span style="
-                color: #7DD3FC;
-                font-weight: 600;
-                background: rgba(56, 189, 248, 0.15);
-                padding: 2px 8px;
-                border-radius: 6px;
-            ">
-                Admin
-            </span>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# ============================================================
 
 
 # ============================================================
@@ -1136,7 +1072,7 @@ def render_dashboard(df_emp, df_att, df_leave):
         selected_date,
     )
 
-    present_set = (
+    raw_present_set = (
         set(df_day["Employee"].unique())
         if not df_day.empty
         else set()
@@ -1147,6 +1083,8 @@ def render_dashboard(df_emp, df_att, df_leave):
         selected_date,
     )
 
+    # Approved leave is counted as Leave only when the employee has no punch.
+    present_set = raw_present_set - leave_set
     present_today = len(present_set)
 
     leave_today = len(
@@ -2096,7 +2034,24 @@ def render_clock_in_out(df_att):
                         hours_dec
                     )
 
-                    row_number = int(idx) + 2
+                    # Find the physical Google Sheet row instead of assuming
+                    # pandas index + 2 always matches the worksheet row.
+                    all_values = sheet.get_all_values()
+                    row_number = None
+                    for sheet_row_no, values in enumerate(all_values[1:], start=2):
+                        padded = list(values) + [""] * max(0, len(ATTENDANCE_HEADERS) - len(values))
+                        if (
+                            date_key(padded[0]) == date_key(today_str)
+                            and norm_name(padded[1]) == user
+                            and clean_text(padded[2]) == login
+                            and not clean_text(padded[3])
+                        ):
+                            row_number = sheet_row_no
+                            break
+
+                    if row_number is None:
+                        st.error("❌ Active login row could not be located in Google Sheets.")
+                        st.stop()
 
                     try:
                         sheet.update_cell(
@@ -3554,24 +3509,21 @@ def render_admin_panel(
 def main():
     df_emp = load_employee_master()
 
-# ============================================================
-# ✅ SESSION STATE INITIALIZATION
-# ============================================================
-if "page" not in st.session_state:
-    st.session_state["page"] = "Dashboard"  # set to your default starting page
+    # Initialize session state on every rerun.
+    defaults = {
+        "page": "📊 Dashboard",
+        "logged_in": False,
+        "role": "",
+        "employee": "",
+        "location": {},
+        "users": {},
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-
-if "role" not in st.session_state:
-    st.session_state["role"] = ""
-
-if "employee" not in st.session_state:
-    st.session_state["employee"] = ""
-
-    st.session_state["users"] = build_users(
-        df_emp
-    )
+    # Always rebuild authentication users from the current employee master.
+    st.session_state["users"] = build_users(df_emp)
 
     if not st.session_state["logged_in"]:
         render_login_page()
@@ -3581,191 +3533,42 @@ if "employee" not in st.session_state:
     df_leave = load_leave()
 
     render_sidebar()
-
-    # 👈 PUT THE NEW DYNAMIC HEADER HERE
-
-    # THEN CONTINUE
-    # ✅ Safely returns "Dashboard" (or your default page name) if not set
-    page = st.session_state.get("page", "Dashboard")
-
-    if page == "📊 Dashboard":
-        render_dashboard(...)
-
-        render_brand_header(
-            st.session_state["employee"],
-            st.session_state["role"],
-        )
-
-# ============================================================
-# PASTE DYNAMIC HEADER HERE
-# ============================================================
-
-now_ist = get_ist()
-current_hour = now_ist.hour
-
-if current_hour < 12:
-    greeting = "Good Morning"
-elif current_hour < 17:
-    greeting = "Good Afternoon"
-else:
-    greeting = "Good Evening"
-
-formatted_date = now_ist.strftime("%A, %d %B %Y")
-
-user_display_name = str(
-    st.session_state.get("employee", "ADMIN")
-).strip().title()
-
-user_role_display = str(
-    st.session_state.get("role", "Admin")
-).strip().title()
-
-st.markdown(
-    f"""
-    <div style="
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        background:linear-gradient(
-            135deg,
-            #0F172A 0%,
-            #1E293B 100%
-        );
-        padding:16px 24px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,0.08);
-        box-shadow:0 4px 20px rgba(0,0,0,0.15);
-        margin-bottom:20px;
-    ">
-
-        <div>
-            <h3 style="
-                margin:0;
-                color:#FFFFFF;
-                font-size:1.25rem;
-                font-weight:700;
-            ">
-                Lancers Risk Consulting
-            </h3>
-
-            <p style="
-                margin:2px 0 0 0;
-                color:#94A3B8;
-                font-size:0.82rem;
-            ">
-                Enterprise Attendance & Workforce Analytics
-            </p>
-        </div>
-
-        <div style="text-align:right;">
-
-            <div style="
-                color:#FFFFFF;
-                font-weight:700;
-                font-size:0.95rem;
-            ">
-                {greeting}, {user_display_name} 👋
-            </div>
-
-            <div style="
-                color:#94A3B8;
-                font-size:0.78rem;
-                margin-top:2px;
-            ">
-                {formatted_date} · Role:
-                <span style="
-                    color:#7DD3FC;
-                    font-weight:600;
-                    background:rgba(56,189,248,0.15);
-                    padding:2px 8px;
-                    border-radius:6px;
-                ">
-                    {user_role_display}
-                </span>
-            </div>
-
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# ============================================================
-# EXISTING PAGE LOGIC CONTINUES
-# ============================================================
-
-page = st.session_state["page"]
-if page == "📊 Dashboard":
-    render_dashboard(
-        df_emp,
-        df_att,
-        df_leave,
+    render_brand_header(
+        st.session_state["employee"],
+        st.session_state["role"],
     )
 
-elif page == "⏱️ Clock In / Out":
-        render_clock_in_out(
-            df_att
-        )
+    page = st.session_state.get("page", "📊 Dashboard")
 
-elif page == "📋 Attendance Records":
-        render_attendance_records(
-            df_att
-        )
-
-elif page == "👤 Employee Profile":
-        render_employee_profile(
-            df_emp,
-            df_att,
-        )
-
-elif page == "🏖️ Leave Management":
-        render_leave_management(
-            df_leave
-        )
-
-elif page == "📈 Analytics":
-        render_analytics(
-            df_att
-        )
-
-elif page == "🏢 Department Analysis":
+    if page == "📊 Dashboard":
+        render_dashboard(df_emp, df_att, df_leave)
+    elif page == "⏱️ Clock In / Out":
+        render_clock_in_out(df_att)
+    elif page == "📋 Attendance Records":
+        render_attendance_records(df_att)
+    elif page == "👤 Employee Profile":
+        render_employee_profile(df_emp, df_att)
+    elif page == "🏖️ Leave Management":
+        render_leave_management(df_leave)
+    elif page == "📈 Analytics":
+        render_analytics(df_att)
+    elif page == "🏢 Department Analysis":
         if st.session_state["role"] == "admin":
-            render_department_analysis(
-                df_emp,
-                df_att,
-            )
+            render_department_analysis(df_emp, df_att)
         else:
-            st.error(
-                "🔒 Admin access required."
-            )
-
-elif page == "📍 Location Tracker":
+            st.error("🔒 Admin access required.")
+    elif page == "📍 Location Tracker":
         if st.session_state["role"] == "admin":
-            render_location_tracker(
-                df_att
-            )
+            render_location_tracker(df_att)
         else:
-            st.error(
-                "🔒 Admin access required."
-            )
-
-elif page == "📑 Reports & Export":
-        render_reports(
-            df_att,
-            df_leave,
-        )
-
-elif page == "⚙️ Admin Control Panel":
+            st.error("🔒 Admin access required.")
+    elif page == "📑 Reports & Export":
+        render_reports(df_att, df_leave)
+    elif page == "⚙️ Admin Control Panel":
         if st.session_state["role"] == "admin":
-            render_admin_panel(
-                df_att,
-                df_emp,
-            )
+            render_admin_panel(df_att, df_emp)
         else:
-            st.error(
-                "🔒 Admin access required."
-            )
+            st.error("🔒 Admin access required.")
 
 
 if __name__ == "__main__":
