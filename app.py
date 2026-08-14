@@ -712,71 +712,68 @@ def render_login_page():
         st.error("❌ Invalid username or password.")
 
 # ============================================================
-# ✅ EXECUTIVE HEADER BANNER
+# ✅ EXECUTIVE HEADER BANNER (WRAPPED IN PYTHON)
 # ============================================================
 
-st.markdown(
-    """
-    <div style="
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
-        padding: 16px 24px;
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        margin-bottom: 20px;
-    ">
-        <!-- Left Side: Brand Title & Subtitle -->
-        <div>
-            <h3 style="
-                margin: 0;
-                color: #FFFFFF;
-                font-size: 1.25rem;
-                font-weight: 700;
-            ">
-                Lancers Risk Consulting
-            </h3>
-            <p style="
-                margin: 2px 0 0 0;
-                color: #94A3B8;
-                font-size: 0.82rem;
-            ">
-                Enterprise Attendance & Workforce Analytics
-            </p>
-        </div>
+st.markdown("""
+<div style="
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    padding: 16px 24px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    margin-bottom: 20px;
+">
+    <!-- Left Side: Brand Title & Subtitle -->
+    <div>
+        <h3 style="
+            margin: 0;
+            color: #FFFFFF;
+            font-size: 1.25rem;
+            font-weight: 700;
+        ">
+            Lancers Risk Consulting
+        </h3>
+        <p style="
+            margin: 2px 0 0 0;
+            color: #94A3B8;
+            font-size: 0.82rem;
+        ">
+            Enterprise Attendance & Workforce Analytics
+        </p>
+    </div>
 
-        <!-- Right Side: User Greeting, Date & Role Badge -->
-        <div style="text-align: right;">
-            <div style="
-                color: #FFFFFF;
-                font-weight: 700;
-                font-size: 0.95rem;
+    <!-- Right Side: User Greeting, Date & Role Badge -->
+    <div style="text-align: right;">
+        <div style="
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 0.95rem;
+        ">
+            Good Afternoon, Admin 👋
+        </div>
+        <div style="
+            color: #94A3B8;
+            font-size: 0.78rem;
+            margin-top: 2px;
+        ">
+            Friday, 14 August 2026 · Role:
+            <span style="
+                color: #7DD3FC;
+                font-weight: 600;
+                background: rgba(56, 189, 248, 0.15);
+                padding: 2px 8px;
+                border-radius: 6px;
             ">
-                Good Afternoon, Admin 👋
-            </div>
-            <div style="
-                color: #94A3B8;
-                font-size: 0.78rem;
-                margin-top: 2px;
-            ">
-                Friday, 14 August 2026 · Role:
-                <span style="
-                    color: #7DD3FC;
-                    font-weight: 600;
-                    background: rgba(56, 189, 248, 0.15);
-                    padding: 2px 8px;
-                    border-radius: 6px;
-                ">
-                    Admin
-                </span>
-            </div>
+                Admin
+            </span>
         </div>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+</div>
+""", unsafe_allow_html=True)
 
 
 # ============================================================
