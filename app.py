@@ -11,6 +11,260 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_geolocation import streamlit_geolocation
 
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
+# ============================================================
+# ✅ LIGHT DASHBOARD CUSTOM CSS
+# ============================================================
+
+st.markdown("""
+<style>
+    /* Global Page Styling */
+    .main .block-container {
+        max-width: 1350px;
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+    
+    /* White Rounded Card Layout */
+    .dashboard-card {
+        background-color: #ffffff;
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 20px;
+    }
+
+    /* KPI Card Box */
+    .kpi-card {
+        background-color: #ffffff;
+        border-radius: 16px;
+        padding: 16px 20px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+    .kpi-title { font-size: 0.85rem; color: #6b7280; font-weight: 600; }
+    .kpi-val { font-size: 1.6rem; font-weight: 700; color: #111827; margin: 4px 0; }
+    .kpi-sub-green { font-size: 0.78rem; color: #10b981; font-weight: 600; }
+    .kpi-sub-pink { font-size: 0.78rem; color: #ec4899; font-weight: 600; }
+
+    /* Employee Status Items */
+    .emp-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: #374151;
+    }
+    .dot-green { height: 10px; width: 10px; background-color: #10b981; border-radius: 50%; display: inline-block; }
+    .dot-pink { height: 10px; width: 10px; background-color: #ec4899; border-radius: 50%; display: inline-block; }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# ✅ MAIN DASHBOARD GRID
+# ============================================================
+
+col_left, col_right = st.columns([1, 3.2])
+
+# ------------------------------------------------------------
+# LEFT COLUMN: EMPLOYEE STATUS LIST
+# ------------------------------------------------------------
+with col_left:
+    st.markdown("""
+    <div class="dashboard-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h4 style="margin: 0; color: #111827; font-size: 1.1rem;">Employees</h4>
+            <span style="font-weight: 700; color: #10b981; font-size: 1.1rem;">13 <span style="color: #9ca3af; font-size: 0.9rem;">/ 16</span></span>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    dept_filter = st.selectbox("Department", ["All Departments", "Operations", "Consulting", "IT"], label_visibility="collapsed")
+    
+    # Employee List with Live Status Dots
+    employees_data = [
+        ("Fiona Varley", True), ("Shreya McCallum", True), ("Heidi Andrews", True),
+        ("Kealan Madden", True), ("Dillon Hill", True), ("Lucia Walters", True),
+        ("Rene Holcomb", True), ("Alison Strong", True), ("Dave Jull", True),
+        ("Trevor Wu", True), ("Cair Byron", True), ("Samantha Parsons", True),
+        ("Amber Childs", True), ("Taylor Smith", False), ("Dylan Fear", False), ("Hannah Martin", False)
+    ]
+
+    st.markdown("<div style='margin-top: 15px;'>", unsafe_allow_html=True)
+    for name, is_active in employees_data:
+        dot_class = "dot-green" if is_active else "dot-pink"
+        st.markdown(f'<div class="emp-item"><span class="{dot_class}"></span>{name}</div>', unsafe_allow_html=True)
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+# ------------------------------------------------------------
+# RIGHT COLUMN: CHARTS & METRICS GRID
+# ------------------------------------------------------------
+with col_right:
+    
+    # --- ROW 1: TOP CHARTS (PRODUCTIVE HOURS & ATTENDANCE TREND) ---
+    r1_col1, r1_col2 = st.columns(2)
+
+    with r1_col1:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h5 style="margin: 0; color: #111827;">Total Productive Hours</h5>
+                <p style="margin: 0; font-size: 0.78rem; color: #9ca3af;">Compared to last week</p>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 1.2rem; font-weight: 700; color: #10b981;">450</span><span style="color: #9ca3af;"> / 500 hours</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Bar Chart: Productive Hours
+        days = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+        actual_hours = [35, 18, 42, 38, 45, 15, 12]
+        target_hours = [40, 30, 45, 42, 48, 20, 18]
+
+        fig_bar = go.Figure()
+        fig_bar.add_trace(go.Bar(x=days, y=actual_hours, name='Actual', marker_color='#F59E0B', width=0.35))
+        fig_bar.add_trace(go.Bar(x=days, y=target_hours, name='Target', marker_color='#E5E7EB', width=0.35))
+        
+        fig_bar.update_layout(
+            barmode='group',
+            height=210,
+            margin=dict(l=10, r=10, t=20, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            showlegend=False,
+            yaxis=dict(showgrid=True, gridcolor='#f3f4f6')
+        )
+        st.plotly_chart(fig_bar, use_container_width=True, config={'displayModeBar': False})
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with r1_col2:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown("""
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h5 style="margin: 0; color: #111827;">Total Attendance</h5>
+                <p style="margin: 0; font-size: 0.78rem; color: #9ca3af;">Compared to last week</p>
+            </div>
+            <span style="font-size: 1.3rem; font-weight: 700; color: #10b981;">18 <span style="font-size: 0.8rem; font-weight: 600;">▲ Up 5%</span></span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Line Chart: Attendance Trend
+        trend_current = [12, 8, 16, 14, 8, 12, 5]
+        trend_previous = [15, 10, 18, 15, 17, 14, 7]
+
+        fig_line = go.Figure()
+        fig_line.add_trace(go.Scatter(x=days, y=trend_current, mode='lines+markers', line=dict(color='#F59E0B', width=3), name='This Week'))
+        fig_line.add_trace(go.Scatter(x=days, y=trend_previous, mode='lines', line=dict(color='#CBD5E1', width=2, dash='dot'), name='Last Week'))
+
+        fig_line.update_layout(
+            height=210,
+            margin=dict(l=10, r=10, t=20, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            showlegend=False,
+            yaxis=dict(showgrid=True, gridcolor='#f3f4f6')
+        )
+        st.plotly_chart(fig_line, use_container_width=True, config={'displayModeBar': False})
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- ROW 2: BOTTOM CHARTS & 2x2 METRIC GRID ---
+    r2_col1, r2_col2, r2_col3 = st.columns([1.2, 1.2, 1.6])
+
+    with r2_col1:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown('<h5 style="margin: 0 0 10px 0; color: #111827;">Lateness</h5>', unsafe_allow_html=True)
+
+        # Horizontal Bar Chart
+        categories = ['Early', 'On-time', 'Late']
+        counts = [3, 9, 2]
+        colors = ['#F59E0B', '#10B981', '#EC4899']
+
+        fig_horiz = go.Figure(go.Bar(
+            x=counts, y=categories, orientation='h',
+            marker=dict(color=colors), width=0.4
+        ))
+        fig_horiz.update_layout(
+            height=180,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(showgrid=False)
+        )
+        st.plotly_chart(fig_horiz, use_container_width=True, config={'displayModeBar': False})
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with r2_col2:
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown('<h5 style="margin: 0 0 10px 0; color: #111827;">Worked Hours</h5>', unsafe_allow_html=True)
+
+        # Donut Chart
+        fig_donut = go.Figure(data=[go.Pie(
+            labels=['Standard', 'Overtime', 'Leave', 'Other'],
+            values=[70, 15, 10, 5],
+            hole=.6,
+            marker=dict(colors=['#F59E0B', '#10B981', '#EC4899', '#E5E7EB']),
+            textinfo='none'
+        )])
+        fig_donut.update_layout(
+            height=180,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            showlegend=False
+        )
+        st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with r2_col3:
+        # 2x2 Metric Grid
+        m_row1_1, m_row1_2 = st.columns(2)
+        with m_row1_1:
+            st.markdown("""
+            <div class="kpi-card">
+                <div class="kpi-title">Total Hours</div>
+                <div class="kpi-val">2300</div>
+                <div class="kpi-sub-green">▲ Up 28% from last week</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with m_row1_2:
+            st.markdown("""
+            <div class="kpi-card">
+                <div class="kpi-title">Total Attendance</div>
+                <div class="kpi-val" style="color: #10b981;">20 <span style="font-size: 1rem; color: #6b7280;">/ 22 hrs</span></div>
+                <div class="kpi-sub-green">▲ Up 8% from last week</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
+
+        m_row2_1, m_row2_2 = st.columns(2)
+        with m_row2_1:
+            st.markdown("""
+            <div class="kpi-card">
+                <div class="kpi-title">Employees Late</div>
+                <div class="kpi-val" style="color: #ec4899;">12</div>
+                <div class="kpi-sub-pink">▼ Up 20% from avg</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with m_row2_2:
+            st.markdown("""
+            <div class="kpi-card">
+                <div class="kpi-title">Total Flags</div>
+                <div class="kpi-val" style="color: #ec4899;">17</div>
+                <div class="kpi-sub-pink">▼ Up 33% from avg</div>
+            </div>
+            """, unsafe_allow_html=True)
+
 import base64
 import streamlit as st
 
