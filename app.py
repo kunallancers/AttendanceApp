@@ -911,27 +911,26 @@ def parse_duration_to_hours(val):
 
 def weekly_metrics(df, selected_date):
     """
-    Calculates 7-day Monday-to-Sunday metrics safely without crashing on strings.
+    Calculates 7-day Monday-to-Sunday metrics safely.
+    Returns datetime objects in week_days to support .strftime() calls downstream.
     """
-    # 1. Normalize dates in dataframe
     if df is None or df.empty:
-        return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], [0.0] * 7, [0] * 7
+        start_of_week = selected_date - timedelta(days=selected_date.weekday())
+        week_days_dt = [start_of_week + timedelta(days=i) for i in range(7)]
+        return week_days_dt, [0.0] * 7, [0] * 7
 
     df_copy = df.copy()
     df_copy["Date_dt"] = pd.to_datetime(
         df_copy["Date"], dayfirst=True, format="mixed", errors="coerce"
     )
 
-    # 2. Convert 'Working Hours' strings safely to numeric float hours
     if "Working Hours" in df_copy.columns:
         df_copy["Hours_Numeric"] = df_copy["Working Hours"].apply(parse_duration_to_hours)
     else:
         df_copy["Hours_Numeric"] = 0.0
 
-    # 3. Calculate 7 days (Monday to Sunday) for the selected week
     start_of_week = selected_date - timedelta(days=selected_date.weekday())
     week_days_dt = [start_of_week + timedelta(days=i) for i in range(7)]
-    week_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
     actual_hours = []
     attendance_count = []
@@ -950,7 +949,8 @@ def weekly_metrics(df, selected_date):
         actual_hours.append(day_total_hrs)
         attendance_count.append(day_att_count)
 
-    return week_labels, actual_hours, attendance_count
+    # ✅ Returns datetime objects in week_days_dt
+    return week_days_dt, actual_hours, attendance_count
 
 # ============================================================
 # 11. CHART / KPI HELPERS
